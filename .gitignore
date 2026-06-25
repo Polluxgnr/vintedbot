@@ -1,0 +1,41 @@
+# Secrets (keep .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+
+# Python
+*.pyc
+*.pyo
+__pycache__/
+*.egg-info/
+.eggs/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE / editor
+.cursor/
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Local run data (cookies, logs, caches, exports)
+brouillon/data/
+bench_out/
+
+# Logs
+*.log

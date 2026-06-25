@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vf-finder"
+version = "0.1.0"
+description = "VF Finder — second-hand deal triage + scoring (GUI + CLI)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "VF Finder contributors" }]
+dependencies = [
+  "requests>=2.31.0",
+  "tenacity>=8.2.0",
+]
+
+[project.optional-dependencies]
+gui = [
+  "customtkinter>=5.2.2",
+  "Pillow>=10.2.0",
+]
+scrape = [
+  "undetected-chromedriver>=3.5.5",
+  "selenium>=4.18.0",
+  "beautifulsoup4>=4.12.0",
+  "aiohttp>=3.9.0; python_version >= '3.9'",
+]
+export = [
+  "openpyxl>=3.1.0",
+]
+all = [
+  "customtkinter>=5.2.2",
+  "Pillow>=10.2.0",
+  "undetected-chromedriver>=3.5.5",
+  "selenium>=4.18.0",
+  "beautifulsoup4>=4.12.0",
+  "openpyxl>=3.1.0",
+  "aiohttp>=3.9.0; python_version >= '3.9'",
+]
+
+[project.scripts]
+vf = "vf.__main__:main"
+vf-finder = "vf.__main__:main"
+
+[tool.setuptools]
+packages = ["vf", "vf_scrape"]
