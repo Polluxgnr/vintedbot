@@ -30,6 +30,8 @@ from .vinted.client import VintedClient, VintedUnavailable
 log = logging.getLogger(__name__)
 
 Progress = Callable[[str], Awaitable[None]]
+# Below this share of a model's typical resale price, a listing is not that model (game, case, part...).
+MODEL_PRICE_FLOOR = 0.25
 Pool = tuple[set[str], list[tuple[float, Condition]]]
 Notify = Callable[[int, Deal], Awaitable[None]]
 
@@ -52,11 +54,17 @@ class Hunter:
         self._last_tracker = 0.0
         self._yield: dict[int, float] = {}                 # watch -> recent good-deal yield (EWMA)
         self._last_cleanup = 0.0
+        self._interactive = 0                          # user requests in flight: background loops yield to them
         self.ai_notice: str | None = None   # last budget / API problem, surfaced in /stats
 
     # ============================================================ cascade
     def _identify(self, listing: Listing, niche: Niche | None) -> Listing:
-        ref = niche.identify(listing.title, listing.description) if niche else None
+        # A listing the niche rejects (cover, empty box, stand...) must never feed a model's price memory:
+        # 126 PS5 accessories at ~30 € once dragged the "PS5" comparables down to 30 €.
+        excluded = niche is not None and niche.excluded_by(normalize(listing.title)) is not None
+        ref = niche.identify(listing.title, listing.description) if niche and not excluded else None
+        if ref and listing.price < ref.resale * MODEL_PRICE_FLOOR:
+            ref = None   # "FIFA 21 ps5" at 3 €: a game or an accessory named after the console, not the console
         if ref:
             return listing.model_copy(update={"niche_id": niche.id, "model_key": f"{niche.id}:{ref.key}",
                                               "model_name": ref.name})
@@ -71,7 +79,10 @@ class Hunter:
             ref = next((m for m in niche.models if m.key == key), None)
         comps = await self.db.comparables(listing.model_key, exclude_id=listing.id) if listing.model_key else []
         if len(comps) < 4 and not ref and pool and pool[0] <= set(normalize(listing.title).split()):
-            comps = pool[1]       # unknown product: compare with the other results of the same search
+            pool_median = statistics.median(p for p, _ in pool[1])
+            # A 40 € "PS5 slim power supply" must not borrow the price of PS5 Slim consoles.
+            if listing.price >= pool_median * MODEL_PRICE_FLOOR:
+                comps = pool[1]   # unknown product: compare with the other results of the same search
         # The AI is asked for the price of a COMPLETE item in very good condition (baseline);
         # missing parts and defects are applied afterwards in scoring.adjust_valuation.
         ai_estimate = verdict.resale_estimate if verdict and verdict.relevant else None
@@ -127,12 +138,13 @@ class Hunter:
         candidates = sorted((d for d in deals if promising(d)), key=lambda d: d.score, reverse=True)
         limit = {"watch": self.s.max_details_per_cycle, "hunt": 15, "full": 5}[mode]
         candidates = candidates[:limit]
-        await progress(f"🧮 {len(listings)} annonces · {len(survivors)} après filtres · {len(candidates)} prometteuses")
+        await progress(f"🧮 {len(survivors)}/{len(listings)} annonces gardées · {len(candidates)} prometteuses")
 
         # ---- detail fetch (Vinted requests are a cost too)
         enriched: list[Listing] = []
-        for d in candidates:
+        for i, d in enumerate(candidates, 1):
             l = d.listing
+            await progress(f"📖 Lecture des descriptions {i}/{len(candidates)}")
             if not l.details_loaded:
                 try:
                     l = self._identify(await self.vinted.enrich(l), niche)
@@ -151,11 +163,11 @@ class Hunter:
             todo = [l for l in enriched if not verdicts.get(l.id) or verdicts[l.id].tier < 2]
             todo = todo[: self.s.max_triage_per_cycle if mode == "watch" else 60]
             if todo:
-                await progress(f"🧠 Tri IA de {len(todo)} annonces…")
+                await progress(f"🧠 Analyse IA de {len(todo)} annonces (modèle exact, pièces, vendeur)")
                 for lid, v in (await self.ai.triage(todo, niche, spec, rs)).items():
                     verdicts[lid] = v
                     await self.db.save_verdict(lid, v)
-                    await self._learn_model(lid, v, niche)
+                enriched = [await self._ai_rekey(l, verdicts.get(l.id), niche) for l in enriched]
 
             ranked = sorted([await self._value(l, niche, rs, spec, verdicts.get(l.id), pool) for l in enriched],
                             key=lambda d: d.score, reverse=True)
@@ -166,7 +178,7 @@ class Hunter:
                               and (mode == "full" or (d.profit or 0) >= min_profit * 0.7)
                               and (d.verdict is None or d.verdict.tier < 3)][:n_vision]
             if vision_targets:
-                await progress(f"📸 Vérification photo de {len(vision_targets)} annonces…")
+                await progress(f"📸 Vérification des photos de {len(vision_targets)} annonces")
             results = await asyncio.gather(*[
                 self.ai.vision(d.listing, niche, spec, d.verdict, d.valuation.fair_value, rs) for d in vision_targets
             ], return_exceptions=True)
@@ -178,6 +190,7 @@ class Hunter:
                     raise v
                 else:
                     log.warning("vision failed for %s: %s", d.listing.id, v)
+            enriched = [await self._ai_rekey(l, verdicts.get(l.id), niche) for l in enriched]
 
             # ---- tier 4: deep verdict, only where the money is
             ranked = sorted([await self._value(l, niche, rs, spec, verdicts.get(l.id), pool) for l in enriched],
@@ -208,14 +221,26 @@ class Hunter:
         final += [d for d in tier1 if d.listing.id not in seen]
         return sorted(final, key=lambda d: d.score, reverse=True)
 
-    async def _learn_model(self, listing_id: int, v: AIVerdict, niche: Niche | None) -> None:
-        """When the AI names a model we had no reference for, re-key it so comparables cluster correctly."""
-        if not v.model_name or not v.relevant:
-            return
-        listing = await self.db.get_listing(listing_id)
-        if listing and listing.model_key and listing.model_key.startswith("sig:"):
-            key = f"ai:{normalize(v.model_name)[:60]}"
-            await self.db.relabel_model(listing_id, key)
+    async def _ai_rekey(self, listing: Listing, v: AIVerdict | None, niche: Niche | None) -> Listing:
+        """Let the AI's exact identification fix the model key.
+
+        "PS5" (version unknown) + AI says "PS5 Slim Digital" -> consoles:ps5_slim_digital, so the right
+        reference price and comparables apply. Unknown products get an "ai:" key so they still cluster.
+        """
+        if not v or not v.model_name or not v.relevant:
+            return listing
+        current = listing.model_key or "sig:"
+        cur_ref = next((m for m in niche.models if f"{niche.id}:{m.key}" == current), None) if niche else None
+        ai_ref = niche.identify(v.model_name) if niche else None
+        new_key = new_name = None
+        if ai_ref and (current.startswith("sig:") or (cur_ref and cur_ref.generic and not ai_ref.generic)):
+            new_key, new_name = f"{niche.id}:{ai_ref.key}", ai_ref.name
+        elif not ai_ref and current.startswith("sig:"):
+            new_key, new_name = f"ai:{normalize(v.model_name)[:60]}", v.model_name
+        if not new_key or new_key == current:
+            return listing
+        await self.db.relabel_model(listing.id, new_key)
+        return listing.model_copy(update={"model_key": new_key, "model_name": new_name})
 
     # ============================================================ live market verification
     async def verify_market(self, deal: Deal, niche: Niche | None, rs: RuntimeSettings,
@@ -264,20 +289,30 @@ class Hunter:
 
     # ============================================================ one-shot actions
     async def hunt(self, spec: SearchSpec, rs: RuntimeSettings, progress: Progress = _noop) -> tuple[list[Deal], Niche | None]:
+        self._interactive += 1                         # the user is waiting: pause background scanning
+        try:
+            return await self._hunt(spec, rs, progress)
+        finally:
+            self._interactive -= 1
+
+    async def _hunt(self, spec: SearchSpec, rs: RuntimeSettings, progress: Progress = _noop) -> tuple[list[Deal], Niche | None]:
         niche = self.niches.get(spec.niche_id) or (self.niches.guess(spec.query) if spec.query else None)
         queries = [spec.query] if spec.query else (niche.queries[:4] if niche else [])
         found: dict[int, Listing] = {}
-        await progress("🔎 Recherche sur Vinted…")
+        await progress("🔎 Recherche sur Vinted")
+        pages = [(q, o, p) for q in queries for o, p in (("relevance", 1), ("newest_first", 1), ("relevance", 2))]
+        done = 0
         for q in queries:
             sub = spec.model_copy(update={"query": q})
             for order, page in (("relevance", 1), ("newest_first", 1), ("relevance", 2)):
                 try:
                     for l in await self.vinted.search(sub, order=order, page=page):
                         found.setdefault(l.id, l)
+                    done += 1
+                    await progress(f"🔎 Recherche sur Vinted {done}/{len(pages)} pages · {len(found)} annonces")
                 except VintedUnavailable as exc:
                     await progress(f"⏳ {exc}")
                     break
-            await progress(f"🔎 {len(found)} annonces récupérées…")
         pool = self.query_pool(list(found.values()), spec.query, niche, spec) if spec.query else None
         deals = await self.evaluate(list(found.values()), niche=niche, spec=spec, rs=rs, mode="hunt",
                                     progress=progress, pool=pool)
@@ -287,14 +322,24 @@ class Hunter:
         shortlist = [d for d in deals if not [f for f in gate_fails(d, niche, rs, spec, require_market=False)
                                               if f.startswith(("profit", "remise", "prix <", "modèle"))]][:4]
         if shortlist:
-            await progress(f"📊 Vérification du marché pour {len(shortlist)} candidates…")
-        checked = {d.listing.id: await self.verify_market(d, niche, rs, spec) for d in shortlist}
+            await progress(f"📊 Comparaison au marché en direct 0/{len(shortlist)}")
+        checked = {}
+        for i, d in enumerate(shortlist, 1):
+            checked[d.listing.id] = await self.verify_market(d, niche, rs, spec)
+            await progress(f"📊 Comparaison au marché en direct {i}/{len(shortlist)}")
         deals = [checked.get(d.listing.id, self._gate(d, niche, rs, spec)) for d in deals]
         deals.sort(key=lambda d: (d.pepite, d.score), reverse=True)
         await self.db.save_radar([d for d in deals if radar_worthy(d)])
         return deals, niche
 
     async def analyze_url(self, url: str, rs: RuntimeSettings, progress: Progress = _noop) -> Deal | None:
+        self._interactive += 1                         # the user is waiting: pause background scanning
+        try:
+            return await self._analyze_url(url, rs, progress)
+        finally:
+            self._interactive -= 1
+
+    async def _analyze_url(self, url: str, rs: RuntimeSettings, progress: Progress = _noop) -> Deal | None:
         await progress("🔗 Lecture de l'annonce…")
         listing = await self.vinted.listing_from_url(url)
         if not listing:
@@ -317,6 +362,13 @@ class Hunter:
         return new.model_copy(update={"watch_id": deal.watch_id})
 
     async def price_check(self, query: str) -> dict:
+        self._interactive += 1                         # the user is waiting: pause background scanning
+        try:
+            return await self._price_check(query)
+        finally:
+            self._interactive -= 1
+
+    async def _price_check(self, query: str) -> dict:
         """Market snapshot for a free-text product: listed price distribution by condition."""
         found: dict[int, Listing] = {}
         for order, page in (("relevance", 1), ("relevance", 2), ("newest_first", 1)):
@@ -457,6 +509,9 @@ class Hunter:
     async def run_forever(self, notify: Notify) -> None:
         log.info("Watch loop started")
         while True:
+            if self._interactive:                              # a user search is running: give it Vinted
+                await asyncio.sleep(1)
+                continue
             if time.monotonic() - self._last_cleanup > 86400:    # daily retention
                 self._last_cleanup = time.monotonic()
                 try:
@@ -472,6 +527,8 @@ class Hunter:
                     log.exception("sales tracker failed")
             try:
                 for w in await self.db.watches(active_only=True):
+                    if self._interactive:
+                        break
                     if time.monotonic() - self._last_run.get(w["id"], 0) < self._interval(w["id"]):
                         continue
                     self._last_run[w["id"]] = time.monotonic()

@@ -174,8 +174,9 @@ niches:
     authenticity_risk: medium
     collectible: false
     model_guard:
-      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|complete?|oled|lite|\bgo\b|\bgb\b|\bto\b|\btb\b)).*\b(?:manettes?|controllers?|joy ?cons?|amiibo|jeux?|games?|juego|spiel|gioco|steelbook|cartouche|cartridge|collection|anniversary|remaster\w*)\b'
-      - '\b(?:housse|etui|sacoche|coque|protection|skin|sticker|support|chargeur seul|dock seul)\b'
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:manettes?|controllers?|dualsense|dual sense|joy ?cons?|joystick|volant|amiibo|jeux?|games?|juego|spiel|gioco|steelbook|cartouche|cartridge|collection|anniversary|aniversario|remaster\w*|portal|casque|headset|camera|remote|telecommande|lecteur seul|disc drive|disk drive|accessoires?)\b'
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:housse|etui|sacoche|coque|carcasa|cover|faceplates?|facade|plaques?|cache|socle|stand|support|silicone|skin|alimentation|power supply|tampas?|tapas?|carcaca|stickers?|autocollants?|protection|ventilateur|ventola|refroidissement|cooler|cooling|station de charge|charging|chargeur|dock seul|boite vide|boite seule|empty box|caja vacia|scatola|gashapon|figurine|lego|3d ?print|rangement|presentoir|tapis|kit|decoration|custom)\b'
+      - '\b(?:playstation portal|ps portal|portal remote)\b|\bportal\b.*\bps ?5\b|\bps ?5\b.*\bportal\b'
     components: [{name: manettes/Joy-Con, match: 'joy ?cons?|manettes?|controllers?', share: 0.22}, {name: dock, match: 'dock|station|socle', share: 0.12}, {name: alimentation/câbles, match: 'chargeur|alimentation|cables?|hdmi|bloc secteur', share: 0.06}, {name: boîte, match: 'boite|carton', share: 0.03}]
     alone: [{match: 'console seule|console uniquement|uniquement la console|tablette seule|ecran seul|sans accessoires?|sans rien', missing: [manettes/Joy-Con, dock, alimentation/câbles]}]
     exclude: ['^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\boled\b|\blite\b)).*\b(?:jeux?|juego|game|spiel|gioco|precinto|scelle)\b', '^jeux?\b', '\bjeu seul\b', '\bmanette seule\b', '^coque\b', '\bskin\b', '\bsupport\b', '\bstation de charge\b',
@@ -187,9 +188,13 @@ niches:
       - {key: switch2, name: Switch 2, match: ['switch 2\b'], resale: 400, new: 469}
       - {key: switch_v2, name: Switch (standard), match: ['nintendo switch\b'], exclude: ['oled', 'lite', 'switch 2'], resale: 150, new: 299}
       - {key: switch_lite, name: Switch Lite, match: ['switch lite'], resale: 110, new: 219}
-      - {key: ps5_disc, name: PS5 lecteur, match: ['\bps ?5\b|playstation 5'], exclude: ['digital', 'numerique', 'pro\b', 'manette seule', '^jeux?\b'], resale: 340, new: 549}
-      - {key: ps5_digital, name: PS5 Digital, match: ['(ps ?5|playstation 5).*(digital|numerique)'], resale: 270, new: 449}
-      - {key: ps5_pro, name: PS5 Pro, match: ['(ps ?5|playstation 5) pro'], resale: 560, new: 799}
+      - {key: ps5_pro, name: PS5 Pro, match: ['(?:ps ?5|playstation 5) ?pro\b'], resale: 560, new: 799}
+      - {key: ps5_slim_digital, name: PS5 Slim Digital, match: ['(?:ps ?5|playstation 5).*slim.*(?:digital|numerique|digitale)|(?:ps ?5|playstation 5).*(?:digital|numerique|digitale).*slim'], resale: 300, new: 449}
+      - {key: ps5_slim_disc, name: PS5 Slim lecteur, match: ['(?:ps ?5|playstation 5).*slim.*(?:lecteur|disque|disc|disk|standard|blu ?ray)|(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray).*slim'], resale: 350, new: 549}
+      - {key: ps5_slim, name: PS5 Slim (version à confirmer), match: ['(?:ps ?5|playstation 5).*slim'], exclude: ['(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)', '\bpro\b'], resale: 320, generic: true}
+      - {key: ps5_digital, name: PS5 Digital (fat), match: ['(?:ps ?5|playstation 5).*(?:digital|numerique|digitale)'], exclude: ['slim', '\bpro\b'], resale: 250}
+      - {key: ps5_disc, name: PS5 lecteur (fat), match: ['(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray)'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)'], resale: 300}
+      - {key: ps5_unknown, name: PS5 (version à confirmer), match: ['\bps ?5\b|playstation 5'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)'], resale: 290, generic: true}
       - {key: steamdeck_oled, name: Steam Deck OLED, match: ['steam ?deck oled'], resale: 430, new: 569}
       - {key: steamdeck, name: Steam Deck LCD, match: ['steam ?deck'], exclude: ['oled'], resale: 280}
       - {key: xsx, name: Xbox Series X, match: ['xbox series x'], resale: 300, new: 549}

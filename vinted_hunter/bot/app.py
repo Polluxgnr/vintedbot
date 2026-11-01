@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import re
 import time
@@ -10,7 +11,7 @@ from datetime import datetime
 from datetime import time as dtime
 
 from telegram import BotCommand, LinkPreviewOptions, Update
-from telegram.constants import ParseMode
+from telegram.constants import ChatAction, ParseMode
 from telegram.error import BadRequest, NetworkError, RetryAfter, TelegramError, TimedOut
 from telegram.ext import (
     Application,
@@ -38,26 +39,97 @@ from . import views as v
 log = logging.getLogger(__name__)
 
 VINTED_URL = re.compile(r"https?://(?:www\.)?vinted\.[a-z.]+/items/\d+[^\s]*")
-Q_QUERY, Q_BUDGET, Q_COND, Q_SIZE, Q_GOAL, Q_PROFIT, Q_MODE = range(7)
-SIZED_NICHES = {"sneakers", "outdoor_premium", "streetwear_designer", "football_shirts"}
+Q_QUERY, Q_BUDGET = range(2)
 INTENT_CONDITIONS = {"new_tags": Condition.NEW_WITH_TAGS, "new": Condition.NEW, "very_good": Condition.VERY_GOOD,
                      "good": Condition.GOOD, "satisfactory": Condition.SATISFACTORY}
 QUIET_HOURS = [22, 23, 0, 1, 2, 3, 4, 5, 6]
 RESULTS_PER_PAGE = 5
 
 
-class Progress:
-    """Edits a single status message, throttled to stay under Telegram flood limits."""
+HUNT_STAGES = [("🔎", "Recherche sur Vinted"), ("🧮", "Filtres, cote & tri"), ("📖", "Lecture des descriptions"),
+               ("🧠", "Analyse IA du texte"), ("📸", "Vérification des photos"), ("🎓", "Analyse experte"),
+               ("📊", "Comparaison au marché en direct")]
+_FRACTION = re.compile(r"(\d+)\s*/\s*(\d+)")
 
-    def __init__(self, message):
+
+class Progress:
+    """A live loading screen: one message, edited in place, showing every step as a checklist.
+
+        ✅ Recherche sur Vinted — 248 annonces
+        ⏳ Lecture des descriptions 8/15  ▓▓▓▓▓░░░░░
+        ⬜ Analyse IA du texte
+        ⏱ 23 s
+
+    The engine reports plain lines starting with a stage emoji; a new emoji closes the previous stage.
+    A ticker refreshes the timer (and Telegram's "typing…") so it never looks frozen.
+    """
+
+    def __init__(self, message, title: str, stages: list[tuple[str, str]] | None = None):
         self.message = message
-        self._last = 0.0
-        self._text = ""
+        self.title = title
+        self.planned = list(stages or HUNT_STAGES)
+        self.done: dict[str, str] = {}
+        self.current: tuple[str, str] | None = None
+        self.started = time.monotonic()
+        self._last_edit = 0.0
+        self._rendered = ""
+        self._ticker: asyncio.Task | None = None
+
+    def start(self) -> "Progress":
+        self._ticker = asyncio.create_task(self._tick())
+        return self
+
+    async def _tick(self) -> None:
+        while True:
+            await asyncio.sleep(4)
+            try:
+                await self.message.get_bot().send_chat_action(self.message.chat_id, ChatAction.TYPING)
+            except TelegramError:
+                pass
+            await self._render(force=True)
+
+    def stop(self) -> None:
+        if self._ticker:
+            self._ticker.cancel()
 
     async def __call__(self, text: str) -> None:
-        if text == self._text or time.monotonic() - self._last < 1.2:
+        emoji = text[:1]
+        known = {e for e, _ in self.planned}
+        if emoji not in known:                       # informative line (e.g. a Vinted pause): show it inline
+            emoji = self.current[0] if self.current else "🔎"
+        if self.current and self.current[0] != emoji:
+            self.done[self.current[0]] = self.current[1]
+        self.current = (emoji, text[1:].strip(" …."))
+        await self._render()
+
+    def _bar(self, text: str) -> str:
+        m = _FRACTION.search(text)
+        if not m or int(m.group(2)) == 0:
+            return ""
+        frac = min(1.0, int(m.group(1)) / int(m.group(2)))
+        return "  " + "▓" * round(frac * 10) + "░" * (10 - round(frac * 10))
+
+    async def _render(self, force: bool = False) -> None:
+        if not force and time.monotonic() - self._last_edit < 1.0:
             return
-        self._text, self._last = text, time.monotonic()
+        lines = [f"<b>{self.title}</b>", ""]
+        cur = self.current[0] if self.current else None
+        reached = True
+        for emoji, label in self.planned:
+            if emoji in self.done:
+                lines.append(f"✅ {html.escape(self.done[emoji])}")
+            elif emoji == cur:
+                lines.append(f"⏳ <b>{html.escape(self.current[1])}</b>{self._bar(self.current[1])}")
+                reached = False
+            elif reached and cur is None:
+                lines.append(f"⬜ {label}")
+            else:
+                lines.append(f"⬜ {label}" if not reached else f"➖ {label}")
+        lines.append(f"\n⏱ {time.monotonic() - self.started:.0f} s")
+        text = "\n".join(lines)
+        if text == self._rendered:
+            return
+        self._rendered, self._last_edit = text, time.monotonic()
         try:
             await self.message.edit_text(text)
         except TelegramError:
@@ -99,20 +171,12 @@ class HunterBot:
             entry_points=[
                 CommandHandler("hunt", self.wiz_start),
                 CallbackQueryHandler(self.wiz_start, pattern=r"^m:hunt$"),
-                CallbackQueryHandler(self.wiz_edit, pattern=r"^i:edit$"),
             ],
             states={
                 Q_QUERY: [CallbackQueryHandler(self.wiz_niche, pattern=r"^w:n:"),
                           MessageHandler(filters.TEXT & ~filters.COMMAND, self.wiz_query)],
                 Q_BUDGET: [CallbackQueryHandler(self.wiz_budget, pattern=r"^w:b:"),
                            MessageHandler(filters.TEXT & ~filters.COMMAND, self.wiz_budget)],
-                Q_COND: [CallbackQueryHandler(self.wiz_cond, pattern=r"^w:c:")],
-                Q_SIZE: [CallbackQueryHandler(self.wiz_size, pattern=r"^w:s:"),
-                         MessageHandler(filters.TEXT & ~filters.COMMAND, self.wiz_size)],
-                Q_GOAL: [CallbackQueryHandler(self.wiz_goal, pattern=r"^w:g:")],
-                Q_PROFIT: [CallbackQueryHandler(self.wiz_profit, pattern=r"^w:p:"),
-                           MessageHandler(filters.TEXT & ~filters.COMMAND, self.wiz_profit)],
-                Q_MODE: [CallbackQueryHandler(self.wiz_mode, pattern=r"^w:m:")],
             },
             fallbacks=[CommandHandler("cancel", self.wiz_cancel), CommandHandler("start", self.cmd_start)],
             allow_reentry=True,
@@ -128,7 +192,8 @@ class HunterBot:
             app.add_handler(CommandHandler(name, fn))
 
         app.add_handler(CallbackQueryHandler(self.on_menu, pattern=r"^m:"))
-        app.add_handler(CallbackQueryHandler(self.on_intent, pattern=r"^i:"))
+        app.add_handler(CallbackQueryHandler(self.on_question, pattern=r"^q:"))
+        app.add_handler(CallbackQueryHandler(self.on_watch_last, pattern=r"^sv$"))
         app.add_handler(CallbackQueryHandler(self.on_niche, pattern=r"^n:"))
         app.add_handler(CallbackQueryHandler(self.on_watch, pattern=r"^wa:"))
         app.add_handler(CallbackQueryHandler(self.on_deal, pattern=r"^d:"))
@@ -137,6 +202,7 @@ class HunterBot:
         app.add_handler(CallbackQueryHandler(self.on_help, pattern=r"^h:"))
         app.add_handler(CallbackQueryHandler(self.on_radar, pattern=r"^(?:tp|rv):"))
         app.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.answer(), pattern=r"^noop$"))
+        app.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.answer("Bouton expiré, relance la recherche")))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.on_text))
         app.add_error_handler(self._on_error)
         self.app = app
@@ -268,19 +334,30 @@ class HunterBot:
 
     # ================================================================ hunt
     async def run_hunt(self, chat_id: int, spec: SearchSpec, context: ContextTypes.DEFAULT_TYPE) -> None:
-        status = await self.app.bot.send_message(chat_id, f"🔎 Chasse lancée : <b>{v.e(spec.describe())}</b>")
-        progress = Progress(status)
+        title = f"🔎 Chasse : {v.e(spec.describe())}"
+        status = await self.app.bot.send_message(chat_id, f"<b>{title}</b>\n\n⏳ Démarrage…")
+        progress = Progress(status, title).start()
         rs = await self._rs(chat_id)
+        context.chat_data["last_spec"] = spec
         try:
             deals, niche = await self.hunter.hunt(spec, rs, progress)
         except VintedUnavailable as exc:
             await status.edit_text(f"⏳ {v.e(exc)} — réessaie dans quelques minutes.")
             return
+        except Exception as exc:                       # never leave the user staring at a frozen screen
+            log.exception("hunt failed")
+            await status.edit_text(f"⚠️ La recherche a échoué ({v.e(type(exc).__name__)}). Réessaie dans un instant.")
+            return
+        finally:
+            progress.stop()
         personal = spec.goal == "personal"
         min_profit = spec.min_profit or 0
         pepites = [d for d in deals if d.pepite]
-        good = pepites or [d for d in deals if d.profit is not None and (personal or d.profit >= min_profit * 0.5)]
-        shown = (good or deals)[:20]
+        floor = max(15.0, min_profit * 0.5)
+        good = pepites + [d for d in deals if not d.pepite and d.profit is not None and d.margin_pct is not None
+                          and (personal or (d.profit >= floor and d.margin_pct >= 10))
+                          and not (d.inspection and d.inspection.scams)]
+        shown = (good or deals[:3])[:20]
         summary = f"✅ Chasse terminée : <b>{v.e(spec.describe())}</b>\n"
         if niche:
             summary += f"Niche : {v.e(niche.label)}\n"
@@ -288,15 +365,21 @@ class HunterBot:
             summary += f"🔥 <b>{len(pepites)} pépite(s) vérifiée(s)</b> sur le marché en direct."
         elif good:
             best = good[0]
-            summary += (f"Aucune pépite qui passe tous les filtres. {len(good)} affaires correctes — meilleure : "
+            summary += (f"Pas de pépite vérifiée, mais {len(good)} affaire(s) à ≥ {floor:.0f} € de profit — meilleure : "
                         f"<b>{best.profit:+.0f} €</b> ({v.e(best.listing.title[:40])}). "
-                        "Chaque carte dit ce qui bloque (🚫).")
+                        "Chaque carte dit ce qui la bloque (🚫).")
         else:
-            summary += "Pas d'affaire évidente pour l'instant. Voici les plus proches 👇 — active une alerte pour être prévenu."
+            summary += ("Rien de rentable pour l'instant (les prix sont au niveau du marché). Voici les 3 plus proches 👇 "
+                        "— active une alerte : je te préviens dès qu'une vraie affaire apparaît.")
         if self.hunter.ai_notice:
             summary += f"\n<i>ℹ️ {v.e(self.hunter.ai_notice)}</i>"
+        summary += f"\n<i>⏱ {time.monotonic() - progress.started:.0f} s · {self.sv.vinted.requests_made} requêtes Vinted</i>"
         await status.edit_text(summary)
         await self._send_results(chat_id, shown, context, personal)
+        await self.app.bot.send_message(
+            chat_id, "Et maintenant ?", reply_markup=v.Kb([
+                [v.Btn("👁 M'alerter sur cette recherche", callback_data="sv")],
+                [v.Btn("🏆 Radar", callback_data="m:top"), v.Btn("🔎 Nouvelle chasse", callback_data="m:hunt")]]))
 
     async def add_watch(self, chat_id: int, spec: SearchSpec) -> None:
         niche = self.sv.niches.get(spec.niche_id)
@@ -305,88 +388,64 @@ class HunterBot:
         await self.app.bot.send_message(
             chat_id, f"👁 Alerte créée : <b>{v.e(spec.describe())}</b>\nJe te préviens dès qu'une affaire passe la cascade.")
 
-    async def _launch(self, chat_id: int, spec: SearchSpec, mode: str, context) -> None:
-        if mode in ("watch", "both"):
-            await self.add_watch(chat_id, spec)
-        if mode in ("now", "both"):
-            context.application.create_task(self.run_hunt(chat_id, spec, context))
+    async def on_watch_last(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        spec = context.chat_data.get("last_spec")
+        await self._answer(update)
+        await self._lock(update, "✅ Alerte activée" if spec else None)
+        if spec:
+            await self.add_watch(update.effective_chat.id, spec)
 
-    # ================================================================ wizard
+    @staticmethod
+    async def _lock(update: Update, chosen: str | None) -> None:
+        """Freeze the buttons of the message that was just answered (no double taps, visible choice)."""
+        q = update.callback_query
+        if not q or not q.message:
+            return
+        try:
+            body = q.message.text_html or ""
+            await q.message.edit_text(f"{body}\n<b>{v.e(chosen)}</b>" if chosen else body, reply_markup=None)
+        except TelegramError:
+            pass
+
+    # ================================================================ guided hunt (2 steps)
     async def wiz_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         context.user_data["draft"] = SearchSpec()
         await self._reply(
             update,
-            "🔎 <b>Nouvelle chasse</b>\n\n<b>1/5</b> Que cherches-tu ? Écris un produit, une marque, un modèle…\n"
-            "<i>ex : « veste arc'teryx beta », « appareil photo argentique », « lot lego »</i>\n\n"
+            "🔎 <b>Nouvelle chasse</b>\n\nQue cherches-tu ? Écris un produit, une marque, un modèle…\n"
+            "<i>ex : « ps5 », « veste arc'teryx beta », « mac mini m2 », « lot lego »</i>\n\n"
             "…ou choisis une niche entière :",
             reply_markup=v.wizard_niches(list(self.sv.niches)),
         )
         return Q_QUERY
 
-    async def wiz_edit(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        context.user_data["draft"] = context.user_data.get("intent_spec") or SearchSpec()
-        await self._reply(update, "<b>Budget maximum ?</b>", reply_markup=v.wizard_budget())
-        return Q_BUDGET
-
     async def wiz_query(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         draft: SearchSpec = context.user_data["draft"]
         draft.query = update.message.text.strip()[:80]
-        if niche := self.sv.niches.guess(draft.query):
-            draft.niche_id = niche.id
-        await update.message.reply_text("<b>2/5</b> Budget maximum ? (ou écris un montant)", reply_markup=v.wizard_budget())
+        await update.message.reply_text("💶 Budget maximum ? (ou écris un montant)", reply_markup=v.wizard_budget())
         return Q_BUDGET
 
     async def wiz_niche(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         draft: SearchSpec = context.user_data["draft"]
         draft.niche_id = update.callback_query.data.split(":", 2)[2]
         niche = self.sv.niches.get(draft.niche_id)
-        await self._reply(update, f"{v.e(niche.label)} ✔️\n\n<b>2/5</b> Budget maximum ?", reply_markup=v.wizard_budget())
+        await self._answer(update)
+        await self._lock(update, f"✅ {niche.label}")
+        await update.effective_chat.send_message("💶 Budget maximum ?", reply_markup=v.wizard_budget())
         return Q_BUDGET
 
     async def wiz_budget(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        draft: SearchSpec = context.user_data["draft"]
+        draft: SearchSpec = context.user_data.pop("draft", SearchSpec())
         raw = update.callback_query.data.split(":")[2] if update.callback_query else update.message.text
         m = re.search(r"\d+", raw or "")
         draft.price_max = float(m.group()) if m and int(m.group()) > 0 else None
-        await self._reply(update, "<b>3/5</b> État minimum ?", reply_markup=v.wizard_condition())
-        return Q_COND
-
-    async def wiz_cond(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        draft: SearchSpec = context.user_data["draft"]
-        draft.conditions = v.CONDITION_CODES[update.callback_query.data.split(":")[2]]
-        if draft.niche_id in SIZED_NICHES:
-            await self._reply(update, "<b>Taille ?</b> (ex : 42, M, 42.5)", reply_markup=v.wizard_size())
-            return Q_SIZE
-        await self._reply(update, "<b>4/5</b> C'est pour…", reply_markup=v.wizard_goal())
-        return Q_GOAL
-
-    async def wiz_size(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        draft: SearchSpec = context.user_data["draft"]
-        draft.size_hint = None if update.callback_query else update.message.text.strip()[:10]
-        await self._reply(update, "<b>4/5</b> C'est pour…", reply_markup=v.wizard_goal())
-        return Q_GOAL
-
-    async def wiz_goal(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        draft: SearchSpec = context.user_data["draft"]
-        draft.goal = update.callback_query.data.split(":")[2]
-        if draft.goal == "resell":
-            await self._reply(update, "<b>5/5</b> Profit net minimum par article ?", reply_markup=v.wizard_profit())
-            return Q_PROFIT
-        await self._reply(update, "<b>5/5</b> On fait quoi ?", reply_markup=v.wizard_mode())
-        return Q_MODE
-
-    async def wiz_profit(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        draft: SearchSpec = context.user_data["draft"]
-        raw = update.callback_query.data.split(":")[2] if update.callback_query else update.message.text
-        m = re.search(r"\d+", raw or "")
-        draft.min_profit = float(m.group()) if m else None
-        await self._reply(update, "<b>Dernière question</b> — on fait quoi ?", reply_markup=v.wizard_mode())
-        return Q_MODE
-
-    async def wiz_mode(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-        await self._answer(update)
-        draft: SearchSpec = context.user_data.pop("draft")
-        await self._launch(update.effective_chat.id, draft, update.callback_query.data.split(":")[2], context)
+        if update.callback_query:
+            await self._answer(update)
+            await self._lock(update, f"✅ ≤ {draft.price_max:.0f} €" if draft.price_max else "✅ Pas de limite")
+        if draft.query:
+            await self.understand(update, context, draft.query, base=draft)
+        else:
+            context.application.create_task(self.run_hunt(update.effective_chat.id, draft, context))
         return ConversationHandler.END
 
     async def wiz_cancel(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -422,51 +481,95 @@ class HunterBot:
 
         await self.understand(update, context, text)
 
-    async def understand(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str) -> None:
-        """Natural-language request -> structured search, confirmed with buttons."""
-        rs = await self._rs(update.effective_chat.id)
+    async def understand(self, update: Update, context: ContextTypes.DEFAULT_TYPE, text: str,
+                         base: SearchSpec | None = None) -> None:
+        """Free text -> search. At most 2 product-specific questions (version, storage, size...), then go."""
+        chat = update.effective_chat
+        thinking = await chat.send_message("🧭 Je comprends ta demande…")
+        rs = await self._rs(chat.id)
         data: dict = {}
         if self.hunter.ai.enabled:
             try:
                 data = await self.hunter.ai.parse_intent(text, list(self.sv.niches), rs)
             except (BudgetExceeded, RuntimeError) as exc:
                 log.warning("intent parsing failed: %s", exc)
-        spec = SearchSpec(
-            query=(data.get("query") or text)[:80],
-            niche_id=data.get("niche_id") if self.sv.niches.get(data.get("niche_id")) else None,
-            price_min=data.get("price_min") or None,
-            price_max=data.get("price_max") or None,
-            conditions=sorted({INTENT_CONDITIONS[c] for c in data.get("conditions") or [] if c in INTENT_CONDITIONS}),
-            size_hint=data.get("size") or None,
-            goal=data.get("goal") if data.get("goal") in ("resell", "personal") else "resell",
-            min_profit=data.get("min_profit") or None,
-            notes=data.get("notes") or None,
-        )
-        if not spec.niche_id and (niche := self.sv.niches.guess(spec.query)):
+        spec = base or SearchSpec()
+        spec.query = (data.get("query") or text)[:80]
+        if self.sv.niches.get(data.get("niche_id")):
+            spec.niche_id = data["niche_id"]
+        elif not spec.niche_id and (niche := self.sv.niches.guess(spec.query)):
             spec.niche_id = niche.id
-        context.user_data["intent_spec"] = spec
-        text_out, kb = v.intent_card(spec, self.sv.niches.get(spec.niche_id), data.get("missing") or [])
-        await update.message.reply_text(text_out, reply_markup=kb)
+        spec.price_min = spec.price_min or data.get("price_min") or None
+        spec.price_max = spec.price_max or data.get("price_max") or None
+        spec.conditions = spec.conditions or sorted(
+            {INTENT_CONDITIONS[c] for c in data.get("conditions") or [] if c in INTENT_CONDITIONS})
+        spec.size_hint = spec.size_hint or data.get("size") or None
+        if data.get("goal") == "personal":
+            spec.goal = "personal"
+        spec.min_profit = spec.min_profit or data.get("min_profit") or None
+        spec.notes = data.get("notes") or spec.notes
+        questions = [q for q in data.get("questions") or []
+                     if isinstance(q, dict) and q.get("question") and len(q.get("options") or []) >= 2][:2]
+        context.user_data["pending"] = {"spec": spec, "questions": questions, "step": 0,
+                                        "watch": bool(data.get("watch"))}
+        niche = self.sv.niches.get(spec.niche_id)
+        understood = f"🧭 J'ai compris : <b>{v.e(spec.describe())}</b>" + (f" · {v.e(niche.label)}" if niche else "")
+        try:
+            await thinking.edit_text(understood)
+        except TelegramError:
+            pass
+        await self._next_question(chat, context)
 
-    async def on_intent(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        q = update.callback_query
-        await self._answer(update)
-        spec = context.user_data.get("intent_spec")
-        if not spec:
-            await q.message.reply_text("Demande expirée, réécris-la 🙂")
+    async def _next_question(self, chat, context: ContextTypes.DEFAULT_TYPE) -> None:
+        pending = context.user_data.get("pending")
+        if not pending:
             return
-        await q.message.edit_reply_markup(None)
-        await self._launch(update.effective_chat.id, spec, {"i:run": "now", "i:watch": "watch", "i:both": "both"}[q.data],
-                           context)
+        if pending["step"] < len(pending["questions"]):
+            q = pending["questions"][pending["step"]]
+            buttons = [v.Btn(str(o.get("label", "?"))[:30], callback_data=f"q:{pending['step']}:{i}")
+                       for i, o in enumerate(q["options"][:6])]
+            rows = [buttons[i:i + 2] for i in range(0, len(buttons), 2)]
+            await chat.send_message(f"❓ <b>{v.e(q['question'])}</b>", reply_markup=v.Kb(rows))
+            return
+        context.user_data.pop("pending", None)
+        spec: SearchSpec = pending["spec"]
+        if pending["watch"]:
+            await self.add_watch(chat.id, spec)
+        context.application.create_task(self.run_hunt(chat.id, spec, context))
+
+    async def on_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        _, step, opt = update.callback_query.data.split(":")
+        pending = context.user_data.get("pending")
+        if not pending or int(step) != pending["step"]:
+            await self._answer(update, "Question déjà répondue")
+            return
+        option = pending["questions"][int(step)]["options"][int(opt)]
+        await self._answer(update)
+        await self._lock(update, f"✅ {option.get('label', '')}")
+        value = str(option.get("value") or "").strip()
+        spec: SearchSpec = pending["spec"]
+        if value and value.lower() not in spec.query.lower():
+            spec.query = f"{spec.query} {value}"[:80]
+        pending["step"] += 1
+        await self._next_question(update.effective_chat, context)
 
     # ================================================================ analyze / price
     async def analyze(self, chat_id: int, url: str) -> None:
-        status = await self.app.bot.send_message(chat_id, "🔗 Analyse en cours…")
+        status = await self.app.bot.send_message(chat_id, "🔗 Analyse de l'annonce…")
+        progress = Progress(status, "🔗 Analyse de l'annonce", [
+            ("🔗", "Lecture de l'annonce"), ("🧮", "Cote & filtres"), ("📖", "Description"), ("🧠", "Analyse IA du texte"),
+            ("📸", "Vérification des photos"), ("🎓", "Analyse experte"), ("📊", "Comparaison au marché en direct")]).start()
         try:
-            deal = await self.hunter.analyze_url(url, await self._rs(chat_id), Progress(status))
+            deal = await self.hunter.analyze_url(url, await self._rs(chat_id), progress)
         except VintedUnavailable as exc:
             await status.edit_text(f"⏳ {v.e(exc)}")
             return
+        except Exception as exc:
+            log.exception("analyze failed")
+            await status.edit_text(f"⚠️ Analyse impossible ({v.e(type(exc).__name__)}). Réessaie dans un instant.")
+            return
+        finally:
+            progress.stop()
         if not deal:
             await status.edit_text("❌ Annonce introuvable (vendue ou supprimée ?)")
             return

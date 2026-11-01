@@ -10,7 +10,7 @@ import math
 
 from .config import RuntimeSettings
 from .inspection import apply_inspection, assess_seller, inspect_listing
-from .models import AIVerdict, Deal, Inspection, Listing, Recommendation, SearchSpec, SellerCheck, Valuation
+from .models import AIVerdict, Deal, Finding, Inspection, Listing, Recommendation, SearchSpec, SellerCheck, Valuation
 from .niches import Niche, normalize
 
 # Without a photo check, scores in fake-prone niches are capped below/near the alert threshold.
@@ -129,9 +129,27 @@ def total_score(parts: dict[str, float], profit_eur: float | None, flags: list[s
     return max(0, min(100, round(s)))
 
 
+_SCAM_WORDS = ("virement", "paypal", "whatsapp", "lydia", "hors vinted", "en dehors de vinted", "western union",
+               "numéro de téléphone", "arnaque")
+
+
+def ai_scam_reason(verdict: AIVerdict | None) -> str | None:
+    """The AI read the full listing: a payment/contact outside Vinted or a doubtful seller is a scam signal."""
+    if not verdict:
+        return None
+    for flag in verdict.red_flags:
+        if any(w in flag.lower() for w in _SCAM_WORDS):
+            return f"IA : {flag}"
+    if verdict.seller_ok is False:
+        return "IA : vendeur jugé douteux"
+    return None
+
+
 def build_deal(listing: Listing, valuation: Valuation, niche: Niche | None, rs: RuntimeSettings,
                verdict: AIVerdict | None = None, spec: SearchSpec | None = None) -> Deal:
     insp = inspect_listing(listing, niche)
+    if (reason := ai_scam_reason(verdict)) and reason not in insp.scams:
+        insp.findings.append(Finding(kind="scam", label=reason))
     valuation = adjust_valuation(listing, valuation, niche, insp, verdict)
     cost = landed_cost(listing, niche, rs)
     profit_eur = margin = None

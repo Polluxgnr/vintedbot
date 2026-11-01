@@ -56,7 +56,7 @@ avouent ce qui manque ("je garde les manettes", "sans chargeur") ou les défauts
 - model: modèle exact identifié (ex: "AirPods Pro 2 USB-C", "Nike Dunk Low Panda"), null si inconnu
 - resale_eur: prix de revente réaliste sur Vinted FR de ce modèle COMPLET en TRÈS BON ÉTAT (null si impossible)
 - new_price_eur: prix neuf actuel en magasin (null si plus vendu neuf ou inconnu)
-- missing: pièces/accessoires normalement fournis mais ABSENTS de cette annonce (ex: ["manettes", "dock"])
+- missing: pièces/accessoires PHYSIQUES normalement fournis mais ABSENTS (ex: ["manettes", "dock"]). Jamais de photos manquantes ni de "non vérifiable" ici (mets-les dans red_flags)
 - adjust_pct: décote en % (négatif) due aux pièces manquantes et défauts de CET article, 0 si complet et sans défaut
 - authenticity_risk: 0 à 1 (prix trop bas, formulation louche, signaux de fake)
 - seller_ok: false si le vendeur semble douteux (nouveau compte + prix trop bas, contact hors Vinted, texte copié...)
@@ -85,7 +85,7 @@ resale_eur = prix de revente du modèle COMPLET en très bon état ; adjust_pct 
 
 Réponds en JSON:
 {{"model": "modèle exact visible", "matches_listing": true, "condition_score": 0-10, "defects": ["..."],
-"missing": ["pièces absentes"], "adjust_pct": -20, "authenticity_risk": 0-1, "authenticity_notes": "...",
+"missing": ["pièces PHYSIQUES absentes, pas les photos manquantes"], "adjust_pct": -20, "authenticity_risk": 0-1, "authenticity_notes": "...",
 "completeness": "ce qui est présent", "resale_eur": nombre, "new_price_eur": nombre|null,
 "positives": ["..."], "red_flags": ["..."], "summary": "2 phrases max"}}"""
 
@@ -124,14 +124,28 @@ def intent(text: str, niches: list[Niche]) -> str:
 
 Niches disponibles: {catalogue}
 
-Transforme sa demande en recherche structurée. JSON:
-{{"query": "mots-clés de recherche Vinted optimaux (courts, en français ou nom de produit)",
+Transforme sa demande en recherche structurée.
+
+RÈGLES :
+- N'invente RIEN : price_max, conditions, size, min_profit restent null/[] si l'utilisateur ne les a pas dits.
+- goal = "personal" seulement s'il dit que c'est pour lui ; sinon "resell".
+- questions : 0 à 2 questions MAXIMUM, uniquement celles qui changent vraiment le prix ou la recherche pour CE
+  produit (version/modèle exact, capacité de stockage, génération, taille de vêtement/chaussure...).
+  JAMAIS de question sur le budget, l'état, revente/perso ou le profit. Si la demande est déjà précise
+  (ex : "ps5 slim digital", "airpods pro 2"), renvoie [].
+  Chaque option a un "label" court (bouton) et une "value" = mots à ajouter à la recherche Vinted
+  ("" si l'option ne change pas la recherche). Mets toujours une dernière option {{"label": "Peu importe", "value": ""}}.
+  Exemple pour "ps5" : {{"question": "Quelle version ?", "options": [{{"label": "Standard (lecteur)", "value": "lecteur"}},
+  {{"label": "Digital", "value": "digital"}}, {{"label": "Slim", "value": "slim"}}, {{"label": "Pro", "value": "pro"}},
+  {{"label": "Peu importe", "value": ""}}]}}
+
+JSON:
+{{"query": "mots-clés de recherche Vinted optimaux (courts, nom de produit)",
 "niche_id": "id de niche ou null", "price_min": nombre|null, "price_max": nombre|null,
-"conditions": ["new_tags"|"new"|"very_good"|"good"|"satisfactory"],
-"size": "taille ou null", "goal": "resell" ou "personal", "min_profit": nombre|null,
-"notes": "contraintes qualitatives utiles, UNE phrase courte (ou null)",
+"conditions": [], "size": null, "goal": "resell", "min_profit": null,
+"notes": "contrainte qualitative explicite de l'utilisateur, UNE phrase (ou null)",
 "watch": true si l'utilisateur veut être alerté en continu,
-"missing": ["questions importantes à poser si la demande est trop vague (max 2)"]}}"""
+"questions": [{{"question": "...", "options": [{{"label": "...", "value": "..."}}]}}]}}"""
 
 
 def negotiation(deal: Deal) -> str:

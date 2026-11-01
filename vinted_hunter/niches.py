@@ -27,6 +27,8 @@ GLOBAL_EXCLUDES = [
     r"\breplica\b", r"\brepro\b", r"\bfake\b", r"\bcopie\b", r"\bdupe\b", r"\b1 1\b", r"\binspired\b",
     r"\bfaux\b", r"\bcontrefacon\b", r"\bfactice\b", r"\bdisplay only\b", r"\bmaquette\b",
     r"\bicloud\b.*\b(?:bloque|lock)", r"\bbloque icloud\b",
+    # wanted ads: "je cherche ps5", "cerco ps5", "busco", "suche", "WTB"
+    r"\b(?:je cherche|cherche|cerco|busco|suche|looking for|wtb)\b", r"^recherche\b", r"^achete\b",
 ]
 # Listings selling only the box/manual/case of a coveted model ("Contax T2 box"). Rejected unless the
 # title says the item comes *with* it ("Contax T2 avec boîte").

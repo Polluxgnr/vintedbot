@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from html import escape
 
 from telegram import InlineKeyboardButton as Btn
 from telegram import InlineKeyboardMarkup as Kb
 
 from ..config import RuntimeSettings
-from ..models import Condition, Deal, Recommendation, SearchSpec
+from ..models import Deal, Recommendation
 from ..niches import Niche
 
 FLAG_LABELS = {
@@ -22,13 +23,10 @@ REC_LABELS = {
     Recommendation.WATCH: "🔵 SURVEILLER",
     Recommendation.SKIP: "🔴 PASSER",
 }
-CONDITION_CODES = {
-    "new_tags": [Condition.NEW_WITH_TAGS],
-    "new": [Condition.NEW_WITH_TAGS, Condition.NEW],
-    "very_good": [Condition.NEW_WITH_TAGS, Condition.NEW, Condition.VERY_GOOD],
-    "good": [Condition.NEW_WITH_TAGS, Condition.NEW, Condition.VERY_GOOD, Condition.GOOD],
-    "any": [],
-}
+
+
+# AI "missing" items that are about evidence, not physical parts
+_META_MISSING = re.compile(r"photo|visible|verifi|vérifi|montr|éventuel|eventuel|preuve|ticket|facture|confirmer")
 
 
 def e(text: object) -> str:
@@ -177,7 +175,10 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
     l, v, vr = d.listing, d.valuation, d.verdict
     head = "🔥" if d.pepite else "🔎"
     title = vr.model_name if vr and vr.model_name else (l.model_name or l.title)
+    insp = d.inspection
     lines = ["🔥🔥 <b>PÉPITE VÉRIFIÉE</b> 🔥🔥"] if d.pepite else []
+    if insp and insp.scams:
+        lines.insert(0, f"🚨 <b>ARNAQUE PROBABLE</b> : {e(insp.scams[0])}")
     lines.append(f"{head} <b>{e(title)}</b>")
     if title != l.title:
         lines.append(f"<i>{e(l.title[:80])}</i>")
@@ -188,18 +189,17 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
         lines.append(f"📈 Cote ≈ <b>{v.fair_value:.0f} €</b> ({v.low:.0f}–{v.high:.0f})  ·  confiance {v.confidence * 100:.0f}%")
     else:
         lines.append("📈 Cote inconnue (pas assez d'annonces comparables)")
-    insp = d.inspection
     missing = [f"{f.label} (−{f.impact * 100:.0f}%)" for f in (insp.missing if insp else [])]
     if vr and vr.missing_parts and not missing:
-        missing = [f"{m} absent(e)s" for m in vr.missing_parts]
+        missing = [m for m in vr.missing_parts if not _META_MISSING.search(m.lower())]
     if missing:
-        lines.append("🧩 <b>Incomplet</b> : " + e(", ".join(missing)))
+        lines.append("🧩 <b>Incomplet</b> : " + e(", ".join(missing[:3])))
     if insp and insp.defects:
         lines.append("🔧 " + e(", ".join(f"{f.label} (−{f.impact * 100:.0f}%)" for f in insp.defects[:3])))
     if d.profit is not None:
         label = "Économie vs cote" if personal else "Profit net"
         lines.append(f"💰 {label} <b>{d.profit:+.0f} €</b> ({d.margin_pct:+.0f}%)")
-    if mc := d.market_check:
+    if d.market_check:
         lines.append(market_line(d))
     if v.sold_count >= 3 and v.days_to_sell is not None:
         lines.append(f"⚡ Ce modèle se vend en ~{v.days_to_sell:.0f} j ({v.sold_count} ventes suivies)")
@@ -217,8 +217,9 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
     extras = " · ".join(filter(None, [age and f"publiée {age}", f"❤️ {l.favourites}" if l.favourites else ""]))
     if extras:
         lines.append(f"⏱ {extras}")
-    if insp and insp.positives:
-        lines.append("✅ " + e(" · ".join(insp.positives)))
+    positives = [p for p in (insp.positives if insp else []) if not (missing and p == "complet")]
+    if positives:
+        lines.append("✅ " + e(" · ".join(positives)))
     if vr:
         if vr.recommendation:
             lines.append(f"\n<b>{REC_LABELS[vr.recommendation]}</b>")
@@ -417,31 +418,14 @@ def wizard_budget() -> Kb:
                [Btn("Pas de limite", callback_data="w:b:0")]])
 
 
-def wizard_condition() -> Kb:
-    return Kb([
-        [Btn("🏷 Neuf avec étiquette", callback_data="w:c:new_tags"), Btn("✨ Neuf", callback_data="w:c:new")],
-        [Btn("👍 Très bon et +", callback_data="w:c:very_good"), Btn("👌 Bon et +", callback_data="w:c:good")],
-        [Btn("🤷 Peu importe", callback_data="w:c:any")],
-    ])
 
 
-def wizard_size() -> Kb:
-    return Kb([[Btn("⏭ Pas de taille", callback_data="w:s:skip")]])
 
 
-def wizard_goal() -> Kb:
-    return Kb([[Btn("💰 Revendre avec profit", callback_data="w:g:resell")],
-               [Btn("🛍 Pour moi (meilleur prix)", callback_data="w:g:personal")]])
 
 
-def wizard_profit() -> Kb:
-    return Kb([[Btn(f"≥ {v} €", callback_data=f"w:p:{v}") for v in (10, 20, 40, 80)]])
 
 
-def wizard_mode() -> Kb:
-    return Kb([[Btn("⚡ Chercher maintenant", callback_data="w:m:now")],
-               [Btn("👁 M'alerter en continu", callback_data="w:m:watch")],
-               [Btn("🚀 Les deux", callback_data="w:m:both")]])
 
 
 def wizard_niches(niches: list[Niche]) -> Kb:
@@ -456,17 +440,6 @@ def wizard_niches(niches: list[Niche]) -> Kb:
     return Kb(rows)
 
 
-def intent_card(spec: SearchSpec, niche: Niche | None, missing: list[str]) -> tuple[str, Kb]:
-    text = f"🧭 J'ai compris : <b>{e(spec.describe())}</b>"
-    if niche:
-        text += f"\nNiche : {e(niche.label)}"
-    if spec.notes:
-        text += f"\nContraintes : <i>{e(spec.notes)}</i>"
-    if missing:
-        text += "\n\n❓ " + "\n❓ ".join(e(m) for m in missing)
-    kb = Kb([[Btn("⚡ Chercher", callback_data="i:run"), Btn("👁 Surveiller", callback_data="i:watch")],
-             [Btn("🚀 Les deux", callback_data="i:both"), Btn("✏️ Affiner", callback_data="i:edit")]])
-    return text, kb
 
 
 # ------------------------------------------------------------------ niches / watches / settings
