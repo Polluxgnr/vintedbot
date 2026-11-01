@@ -1,6 +1,11 @@
 tests/
 test/
+.git/
+.github/
 .env
 data/
 __pycache__/
 *.db
+*.gdoc
+scripts/
+*.bat

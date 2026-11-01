@@ -92,8 +92,28 @@ Resale prices are seeds; live comparables and real sales take over as data accum
 
 1. **Telegram:** **@BotFather** → `/newbot` → copy the token.
 2. **AI:** an OpenRouter key from https://openrouter.ai/keys (a few dollars of credit lasts a long time).
-3. **Run:** `start.bat` (creates `.env` on the first run; paste both keys), or `docker compose up -d --build`.
+3. **Run:** `start.bat` (creates `.env` on the first run; paste both keys).
 4. **Claim:** send `/start` to your bot. The first chat becomes the owner.
+
+## Hosting (free)
+
+The bot must run on a **home internet connection**. Vinted blocks datacenter IPs: tested from cloud servers, it answers HTTP 429 after a few requests. Free cloud tiers therefore don't work.
+
+- **Your Windows PC (now):** double-click `installer_demarrage_auto.bat`. After that, the bot:
+  - starts in the background at every login, with no window;
+  - restarts by itself if it crashes;
+  - logs to `%USERPROFILE%\.vinted_hunter\bot.log`.
+
+  Set **Settings → System → Power → Sleep: Never** so it keeps running. To remove it, run `scripts\uninstall_autostart.ps1`.
+- **A mini PC or Raspberry Pi at home (later):** copy the project and `.env` to it, then run `docker compose up -d --build`. The Docker setup:
+  - works on x86 and ARM;
+  - uses Paris time for the 9:00 digest;
+  - keeps the database on a persistent volume and checks the bot's health;
+  - restarts the bot after crashes and reboots.
+
+  Logs: `docker compose logs -f`.
+
+Only one copy of the bot can run per machine: a second copy stops itself, because two copies on the same Telegram token would conflict.
 
 CLI:
 ```bash

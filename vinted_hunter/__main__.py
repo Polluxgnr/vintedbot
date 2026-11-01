@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import logging
 import sys
 
 from .config import RuntimeSettings, get_settings
 from .models import SearchSpec
-from .runtime import build_services, setup_logging
+from .runtime import acquire_single_instance, build_services, setup_logging
 
 
 def _print_deals(deals, limit: int = 15) -> None:
@@ -83,10 +84,15 @@ def main() -> None:
     args = parser.parse_args()
 
     settings = get_settings()
-    setup_logging(settings.log_level)
-    if args.cmd in (None, "bot"):
+    bot_mode = args.cmd in (None, "bot")
+    # The bot logs to a file next to its database (it usually runs in the background, without a console).
+    setup_logging(settings.log_level, settings.db_path.parent / "bot.log" if bot_mode else None)
+    if bot_mode:
         if not settings.telegram_token:
             sys.exit("TELEGRAM_TOKEN manquant dans .env (voir .env.example)")
+        if not acquire_single_instance():
+            logging.getLogger(__name__).warning("Vinted Hunter tourne déjà sur cette machine : arrêt de cette copie.")
+            sys.exit(0)
         from .bot.app import run
 
         run(settings)

@@ -1,10 +1,20 @@
+# On the mini PC:  docker compose up -d --build     (logs: docker compose logs -f)
 services:
   hunter:
     build: .
+    image: vinted-hunter:latest
+    container_name: vinted-hunter
     env_file: .env
+    environment:
+      - TZ=Europe/Paris                # daily digest at 9:00 Paris time
     volumes:
-      - hunter-data:/data            # market memory, alerts, portfolio
-      - ./config:/app/config:ro      # edit niches.yaml without rebuilding
-    restart: unless-stopped
+      - hunter-data:/data              # database (market memory, sales, radar, portfolio) + bot.log
+      - ./config:/app/config:ro        # edit niches.yaml without rebuilding, then: docker compose restart
+    restart: unless-stopped            # survives crashes and reboots
+    mem_limit: 512m
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+
 volumes:
   hunter-data:
