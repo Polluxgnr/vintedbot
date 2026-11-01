@@ -1,0 +1,487 @@
+# Reseller knowledge base.
+#
+# resale = typical price a "very good" item actually sells for on Vinted FR.
+# These are SEED values: the engine blends them with prices it observes every
+# day (comparables) and with AI estimates, so they self-correct over time.
+# Tune them freely - every niche field can also be overridden per niche.
+#
+# Patterns (`match`, `exclude`) are regexes on normalized text:
+# lowercase, no accents, punctuation -> space.
+
+defaults:
+  shipping_eur: 5.0
+  resale_fee_pct: 0
+  authenticity_risk: low
+
+niches:
+
+  sneakers:
+    name: "Sneakers cotées"
+    emoji: "👟"
+    description: "Dunk, Jordan, New Balance, Asics, Salomon, Samba - liquides et faciles à revendre."
+    enabled_by_default: true
+    queries: [nike dunk low, jordan 1, new balance 550, new balance 2002r, new balance 9060, asics gel kayano 14,
+              asics gel 1130, salomon xt-6, adidas samba og, adidas gazelle, onitsuka tiger mexico 66, nike air max 1]
+    price_min: 15
+    price_max: 160
+    shipping_eur: 6.5
+    min_profit: 20
+    authenticity_risk: high
+    collectible: true
+    model_guard:
+      - '\b(?:td|ps|gs|bebe|enfant|kids|junior|toddler|lacets?|semelles?|crep protect|keychain)\b'
+    components: [{name: boîte d'origine, match: 'boite', share: 0.08}, {name: lacets, match: 'lacets?', share: 0.03}, {name: semelles, match: 'semelles?', share: 0.05}]
+    alone: []
+    exclude: ['\b(?:td|ps|gs|bebe|enfant|kids|toddler)\b', '\bsemelles?\b(?! .*inclu)', '\blacets?\b seul', '\bcustom\b']
+    red_flags: [prix < 40% de la cote, photos de stock/catalogue, pas de photo de l'étiquette intérieure, boîte absente sur paire "neuve", vendeur 0 avis + paires multiples]
+    vision_checklist: [étiquette intérieure (code style lisible), usure semelle et talon, plis du toe box, jaunissement, qualité des coutures et du swoosh/logo, boîte d'origine]
+    ai_hints: "Les tailles 40-44 se revendent le mieux. Les coloris Panda/Chicago/Lost&Found/UNC sont les plus liquides. Méfie-toi des \"neuves sans boîte\"."
+    models:
+      - {key: dunk_panda, name: Nike Dunk Low Panda, match: ['dunk low.*(panda|black white|noir.*blanc|blanc.*noir)'], resale: 70, new: 120}
+      - {key: dunk_low, name: Nike Dunk Low (autres coloris), match: ['\bdunk low\b'], resale: 75, new: 120, generic: true}
+      - {key: jordan1_high, name: Air Jordan 1 High OG, match: ['jordan 1 (?:retro )?high', '\baj1 high\b'], resale: 120, new: 190}
+      - {key: jordan1_mid, name: Air Jordan 1 Mid, match: ['jordan 1 mid'], resale: 60, new: 130}
+      - {key: jordan1_low, name: Air Jordan 1 Low, match: ['jordan 1 low'], resale: 65, new: 120}
+      - {key: jordan4, name: Air Jordan 4, match: ['jordan 4\b', '\baj4\b'], resale: 150, new: 220}
+      - {key: nb550, name: New Balance 550, match: ['new balance 550', '\bnb ?550\b', '\bbb550'], resale: 60, new: 130}
+      - {key: nb2002r, name: New Balance 2002R, match: ['2002r'], resale: 80, new: 160}
+      - {key: nb9060, name: New Balance 9060, match: ['9060'], resale: 85, new: 170}
+      - {key: nb990, name: New Balance 990 (v3-v6), match: ['\b990 ?v?[3-6]\b', 'm990'], resale: 120, new: 230}
+      - {key: kayano14, name: Asics Gel-Kayano 14, match: ['kayano 14'], resale: 85, new: 160}
+      - {key: gel1130, name: Asics Gel-1130, match: ['gel 1130'], resale: 60, new: 120}
+      - {key: xt6, name: Salomon XT-6, match: ['xt ?6\b'], resale: 110, new: 200}
+      - {key: samba, name: Adidas Samba OG, match: ['\bsamba\b'], resale: 60, new: 120}
+      - {key: gazelle, name: Adidas Gazelle, match: ['\bgazelle\b'], resale: 50, new: 110}
+      - {key: mexico66, name: Onitsuka Tiger Mexico 66, match: ['mexico 66'], resale: 60, new: 120}
+      - {key: airmax1, name: Nike Air Max 1, match: ['air ?max 1\b'], resale: 70, new: 150}
+
+  outdoor_premium:
+    name: "Outdoor premium"
+    emoji: "🏔️"
+    description: "Arc'teryx, The North Face, Patagonia - forte demande, vendeurs qui sous-estiment."
+    enabled_by_default: true
+    queries: [arcteryx, arc'teryx beta, arc'teryx atom, north face nuptse 1996, patagonia retro x, patagonia synchilla,
+              patagonia better sweater, salomon veste gore-tex, mammut veste]
+    price_max: 250
+    shipping_eur: 6
+    min_profit: 25
+    authenticity_risk: high
+    collectible: false
+    model_guard:
+      - '\b(?:junior|enfant|kids?|bambin[oa]|kinder|bebe)\b'
+    components: [{name: capuche, match: 'capuche', share: 0.12}]
+    alone: []
+    exclude: ['\benfant\b', '\bkids\b', '\b(?:bonnet|beanie|berretto|gorro|mutze|muetze|toque|tuque|casquette|cap|hat|chapeau|cappello)\b',
+              '\b(?:gants?|gloves?|handschuhe|guanti|chaussettes?|socks?|tour de cou|cache cou|neck gaiter|sac|bag|backpack|rucksack|sacoche|banane|ceinture|belt|porte cles|keychain)\b']
+    red_flags: [étiquette intérieure absente (Arc'teryx a un code CR), logo brodé imprécis, prix < 35% de la cote]
+    vision_checklist: [étiquettes intérieures et code produit, logo brodé, zips (YKK/Watertight), délaminage gore-tex, boulochage polaire]
+    ai_hints: "Arc'teryx Beta/Alpha SV et Atom se revendent très vite. Les Nuptse 1996 700 sont souvent copiées."
+    models:
+      - {key: arc_beta, name: Arc'teryx Beta (LT/AR/SL), match: ['arc ?teryx.*\bbeta\b'], resale: 280, new: 500}
+      - {key: arc_alpha, name: Arc'teryx Alpha SV/AR, match: ['arc ?teryx.*\balpha\b'], resale: 380, new: 800}
+      - {key: arc_atom, name: Arc'teryx Atom, match: ['arc ?teryx.*\batom\b'], resale: 150, new: 300}
+      - {key: arc_tee, name: Arc'teryx t-shirt, match: ['arc ?teryx.*(?:t ?shirt|\btee\b|long sleeve|manches longues)'], resale: 40, generic: true}
+      - {key: arc_other, name: Arc'teryx veste/polaire (autre), match: ['arc ?teryx.*(?:veste|jacket|polaire|fleece|doudoune|softshell|hardshell|shell|pantalon|pants?|gilet|vest|hoodie|anorak|parka)'], resale: 110, generic: true}
+      - {key: nuptse, name: TNF Nuptse 1996, match: ['nuptse'], resale: 150, new: 330}
+      - {key: retrox, name: Patagonia Retro-X, match: ['retro ?x'], resale: 110, new: 220}
+      - {key: synchilla, name: Patagonia Synchilla, match: ['synchilla'], resale: 60, new: 130}
+      - {key: better_sweater, name: Patagonia Better Sweater, match: ['better sweater'], resale: 55, new: 150}
+
+  streetwear_designer:
+    name: "Streetwear & designer"
+    emoji: "🧥"
+    description: "Stone Island, C.P. Company, Carhartt WIP, Ralph Lauren vintage, Lacoste."
+    enabled_by_default: true
+    queries: [stone island, cp company goggle, carhartt detroit jacket, carhartt wip veste, ralph lauren polo bear,
+              ralph lauren quarter zip, lacoste vintage, burberry trench]
+    price_max: 220
+    shipping_eur: 5.5
+    min_profit: 20
+    authenticity_risk: high
+    collectible: false
+    model_guard:
+      - '\b(?:junior|enfant|kids?|bambin[oa]|nin[oa]s?|kinder|bebe|patch|chaussettes?|socks?|calze)\b'
+    components: [{name: badge, match: 'badge', share: 0.25}, {name: étiquettes, match: 'etiquettes?', share: 0.05}]
+    alone: []
+    exclude: ['\benfant\b', '\bkids\b', '\bbadge seul\b', '\bpatch\b seul']
+    red_flags: [badge Stone Island sans boutons, pas de photo étiquette CERTILOGO/QR, prix < 30% de la cote]
+    vision_checklist: [badge et boutons (Stone Island), étiquettes intérieures et lavage, lentilles goggle (CP), coutures, délavage]
+    ai_hints: "Stone Island - vérifier badge, boutons et étiquettes. Carhartt Detroit vintage (made in USA) vaut bien plus que les rééditions."
+    models:
+      - {key: stone_overshirt, name: Stone Island overshirt/veste, match: ['stone island.*(veste|jacket|overshirt|surchemise|parka)'], resale: 170, new: 450}
+      - {key: stone_sweat, name: Stone Island sweat/pull, match: ['stone island.*(sweat|pull|hoodie|crewneck)'], resale: 95, new: 250}
+      - {key: stone_other, name: Stone Island (autre), match: ['stone island'], resale: 70, generic: true}
+      - {key: cp_goggle, name: C.P. Company goggle, match: ['c ?p company.*goggle', 'goggle.*c ?p company'], resale: 180, new: 600}
+      - {key: cp_other, name: C.P. Company (autre), match: ['c ?p company'], resale: 75, generic: true}
+      - {key: carhartt_detroit, name: Carhartt Detroit jacket, match: ['carhartt.*detroit'], resale: 120}
+      - {key: carhartt_jacket, name: Carhartt veste (Active/Michigan/Santa Fe), match: ['carhartt.*(active|michigan|santa fe|chore)'], resale: 85, new: 200, generic: true}
+      - {key: rl_bear, name: Ralph Lauren Polo Bear, match: ['polo bear', 'ralph lauren.*bear'], resale: 110, new: 330}
+      - {key: rl_qzip, name: Ralph Lauren quarter zip, match: ['ralph lauren.*(quarter|1/4|demi) ?zip'], resale: 45, new: 170, generic: true}
+      - {key: burberry_trench, name: Burberry trench, match: ['burberry.*trench'], resale: 380, new: 2200}
+
+  apple_tech:
+    name: "Apple & tech"
+    emoji: "🍏"
+    description: "AirPods, iPad, MacBook, Apple Watch - les particuliers bradent, mais attention aux fakes et iCloud."
+    enabled_by_default: true
+    queries: [airpods pro 2, airpods max, airpods 4, ipad air, ipad pro, macbook air m1, macbook air m2, macbook pro m1,
+              apple watch series, iphone 13, iphone 14, iphone 15]
+    price_min: 25
+    price_max: 900
+    shipping_eur: 5
+    min_profit: 30
+    authenticity_risk: very_high
+    collectible: false
+    model_guard:
+      - '^(?:coque|etui|housse|protection|verre|cable|chargeur|bracelet|support)\b'
+      - '\b(?:compatible|pour airpods|pour iphone|pour ipad|for airpods|for iphone)\b'
+    components: [{name: boîtier de charge, match: 'boitier|etui de charge', share: 0.5}, {name: un écouteur, match: 'ecouteurs?|airpods? (?:gauche|droit)', share: 0.45}, {name: chargeur/câble, match: 'chargeur|cables?', share: 0.04}, {name: boîte, match: 'boite', share: 0.04}, {name: bracelet, match: 'bracelet', share: 0.06}]
+    alone: [{match: 'boitier seul|etui seul|ecouteur seul|airpods? (?:gauche|droit)(?: seul)?\b', missing: [un écouteur]}]
+    exclude: ['^coque\b', '^etui\b', '^protection\b', '\bboite seule\b', '\bchargeur seul\b', '\bbracelet seul\b',
+              '\bfactice\b', '\bcompatible\b', '\bpro max case\b', '\bverre trempe\b']
+    red_flags: [AirPods "neufs scellés" très bas = fake quasi certain, pas de numéro de série, iCloud non mentionné, batterie < 80%, vendeur pressé / paiement hors Vinted]
+    vision_checklist: [numéro de série visible, état écran et coins, santé batterie (capture), boîtier de charge et charnière, accessoires d'origine]
+    ai_hints: "Les AirPods Pro 2 sont la cible n°1 des contrefaçons - un prix < 60% de la cote avec boîte scellée est suspect. Vérifie la mention iCloud déverrouillé pour iPhone/iPad/Mac."
+    models:
+      - {key: airpods_pro2, name: AirPods Pro 2, match: ['airpods? pro 2', 'airpods? pro (?:2e|2eme|second|usb ?c)'], resale: 140, new: 279}
+      - {key: airpods_pro1, name: AirPods Pro (1re gen), match: ['airpods? pro\b'], exclude: ['pro 2', 'max'], resale: 75}
+      - {key: airpods_max, name: AirPods Max, match: ['airpods? max'], resale: 330, new: 579}
+      - {key: airpods4, name: AirPods 4, match: ['airpods? 4\b'], resale: 95, new: 149}
+      - {key: ipad_air_m, name: iPad Air (M1/M2/M3), match: ['ipad air.*\bm[1-4]\b', 'ipad air (?:5|6|7)'], resale: 380, new: 719}
+      - {key: ipad_pro_m, name: iPad Pro (M1+), match: ['ipad pro.*\bm[1-5]\b'], resale: 560, new: 1199}
+      - {key: mba_m1, name: MacBook Air M1, match: ['macbook air.*\bm1\b'], resale: 450}
+      - {key: mba_m2, name: MacBook Air M2/M3, match: ['macbook air.*\bm[23]\b'], resale: 650, new: 1199}
+      - {key: mbp_m1, name: MacBook Pro M1/M2 Pro/Max, match: ['macbook pro.*\bm[1-3]\b'], resale: 800}
+      - {key: iphone13, name: iPhone 13, match: ['iphone 13\b'], exclude: ['pro', 'mini'], resale: 280}
+      - {key: iphone13pro, name: iPhone 13 Pro, match: ['iphone 13 pro'], resale: 380}
+      - {key: iphone14, name: iPhone 14, match: ['iphone 14\b'], exclude: ['pro', 'plus'], resale: 360}
+      - {key: iphone14pro, name: iPhone 14 Pro, match: ['iphone 14 pro'], resale: 500}
+      - {key: iphone15, name: iPhone 15, match: ['iphone 15\b'], exclude: ['pro', 'plus'], resale: 470, new: 769}
+      - {key: iphone15pro, name: iPhone 15 Pro, match: ['iphone 15 pro'], resale: 640}
+      - {key: watch_s8, name: Apple Watch Series 8-10 / Ultra, match: ['apple watch.*(series (?:8|9|10)|ultra)'], resale: 230, new: 449, generic: true}
+
+  consoles:
+    name: "Consoles récentes"
+    emoji: "🎮"
+    description: "Switch, PS5, Steam Deck, Xbox - volume énorme, revente en 24h."
+    enabled_by_default: true
+    queries: [nintendo switch oled, nintendo switch 2, playstation 5, ps5 slim, steam deck oled, steam deck, xbox series x,
+              nintendo switch lite, ps vita, meta quest 3, ps4 slim, ps4 pro, xbox series s]
+    price_min: 40
+    price_max: 550
+    shipping_eur: 8
+    min_profit: 30
+    authenticity_risk: medium
+    collectible: false
+    model_guard:
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|complete?|oled|lite|\bgo\b|\bgb\b|\bto\b|\btb\b)).*\b(?:manettes?|controllers?|joy ?cons?|amiibo|jeux?|games?|juego|spiel|gioco|steelbook|cartouche|cartridge|collection|anniversary|remaster\w*)\b'
+      - '\b(?:housse|etui|sacoche|coque|protection|skin|sticker|support|chargeur seul|dock seul)\b'
+    components: [{name: manettes/Joy-Con, match: 'joy ?cons?|manettes?|controllers?', share: 0.22}, {name: dock, match: 'dock|station|socle', share: 0.12}, {name: alimentation/câbles, match: 'chargeur|alimentation|cables?|hdmi|bloc secteur', share: 0.06}, {name: boîte, match: 'boite|carton', share: 0.03}]
+    alone: [{match: 'console seule|console uniquement|uniquement la console|tablette seule|ecran seul|sans accessoires?|sans rien', missing: [manettes/Joy-Con, dock, alimentation/câbles]}]
+    exclude: ['^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\boled\b|\blite\b)).*\b(?:jeux?|juego|game|spiel|gioco|precinto|scelle)\b', '^jeux?\b', '\bjeu seul\b', '\bmanette seule\b', '^coque\b', '\bskin\b', '\bsupport\b', '\bstation de charge\b',
+              '\bboite vide\b', '\bdock seul\b', '\bpochette\b']
+    red_flags: [console bannie, joy-con drift, lecteur disque bruyant (PS5), console "reconditionnée" sans détail, numéro de série masqué]
+    vision_checklist: [rayures écran, état joy-con/manettes, accessoires (dock, câbles), numéro de série, boîte]
+    models:
+      - {key: switch_oled, name: Switch OLED, match: ['switch oled'], resale: 220, new: 349}
+      - {key: switch2, name: Switch 2, match: ['switch 2\b'], resale: 400, new: 469}
+      - {key: switch_v2, name: Switch (standard), match: ['nintendo switch\b'], exclude: ['oled', 'lite', 'switch 2'], resale: 150, new: 299}
+      - {key: switch_lite, name: Switch Lite, match: ['switch lite'], resale: 110, new: 219}
+      - {key: ps5_disc, name: PS5 lecteur, match: ['\bps ?5\b|playstation 5'], exclude: ['digital', 'numerique', 'pro\b', 'manette seule', '^jeux?\b'], resale: 340, new: 549}
+      - {key: ps5_digital, name: PS5 Digital, match: ['(ps ?5|playstation 5).*(digital|numerique)'], resale: 270, new: 449}
+      - {key: ps5_pro, name: PS5 Pro, match: ['(ps ?5|playstation 5) pro'], resale: 560, new: 799}
+      - {key: steamdeck_oled, name: Steam Deck OLED, match: ['steam ?deck oled'], resale: 430, new: 569}
+      - {key: steamdeck, name: Steam Deck LCD, match: ['steam ?deck'], exclude: ['oled'], resale: 280}
+      - {key: xsx, name: Xbox Series X, match: ['xbox series x'], resale: 300, new: 549}
+      - {key: ps4_pro, name: PS4 Pro, match: ['(ps ?4|playstation 4) pro'], resale: 170}
+      - {key: ps4_slim, name: PS4 Slim, match: ['(ps ?4|playstation 4) slim'], exclude: ['pro'], resale: 125}
+      - {key: ps4_fat, name: PS4 (fat), match: ['\bps ?4\b|playstation 4'], exclude: ['slim', 'pro', 'manette seule', '^jeux?'], resale: 95}
+      - {key: xss, name: Xbox Series S, match: ['xbox series s\b'], resale: 190, new: 349}
+      - {key: xbox_one_x, name: Xbox One X, match: ['xbox one x\b'], resale: 140}
+      - {key: xbox_one_s, name: Xbox One S, match: ['xbox one s\b'], resale: 90}
+      - {key: wiiu, name: Wii U, match: ['wii ?u\b'], resale: 90}
+      - {key: psvita, name: PS Vita, match: ['ps ?vita'], resale: 140}
+      - {key: quest3, name: Meta Quest 3, match: ['quest 3\b'], exclude: ['3s'], resale: 360, new: 549}
+
+  retro_gaming:
+    name: "Retro gaming"
+    emoji: "👾"
+    description: "Game Boy, GameCube, N64, jeux Pokémon - les greniers regorgent de pépites mal pricées."
+    enabled_by_default: true
+    queries: [game boy color, game boy advance sp, gameboy, nintendo gamecube, nintendo 64, super nintendo, nintendo ds lite, nintendo 3ds,
+              jeu pokemon game boy, pokemon emeraude, pokemon heartgold, lot jeux nintendo, lot jeux gameboy, ps1 lot]
+    price_max: 300
+    shipping_eur: 5
+    min_profit: 20
+    authenticity_risk: high
+    collectible: true
+    model_guard:
+      - '\b(?:cartes?|cards?|tcg|holo|booster|reverse|\d{1,3}/\d{2,3})\b'
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|complete?|oled|lite|\bgo\b|\bgb\b|\bto\b|\btb\b)).*\b(?:manettes?|controllers?|joystick)\b'
+    components: [{name: manette, match: 'manettes?', share: 0.15}, {name: alimentation/câbles, match: 'alimentation|chargeur|cables?|peritel', share: 0.08}, {name: cache piles, match: 'cache piles?|clapet', share: 0.05}, {name: boîte/notice, match: 'boite|notice', share: 0.1}]
+    alone: []
+    allow: ['\bhs\b']
+    exclude: ['\breproduction\b', '\brepro\b', '\bboite seule\b', '\bnotice seule\b', '\bcoque de remplacement\b']
+    red_flags: [cartouche Pokémon GBA/DS à petit prix = repro fréquente, étiquette mal découpée, pas de photo du PCB, "sauvegarde ne marche pas"]
+    vision_checklist: [étiquette cartouche (brillance, découpe), code de lot sur la cartouche, état écran (rayures, pixels morts), compartiment piles (oxydation), complet en boîte (CIB)]
+    ai_hints: "Les lots \"vide-grenier\" vendus en vrac sont la meilleure source de profit - estime la valeur pièce par pièce. Les jeux Pokémon GBA/DS/GB sont massivement contrefaits."
+    models:
+      - {key: gbc, name: Game Boy Color, match: ['game ?boy colou?r'], resale: 70}
+      - {key: gba_sp, name: Game Boy Advance SP, match: ['advance sp\b', '\bgba sp\b'], resale: 90}
+      - {key: gba, name: Game Boy Advance, match: ['game ?boy advance\b'], exclude: ['sp\b'], resale: 60}
+      - {key: gb_dmg, name: Game Boy (DMG), match: ['game ?boy (?:classic|dmg|original|1989)'], resale: 65}
+      - {key: gamecube, name: GameCube console, match: ['gamecube|game cube'], exclude: ['\bjeux?\b', 'manette', 'controller', 'joystick', 'game boy player', 'memory card'], resale: 110}
+      - {key: n64, name: Nintendo 64 console, match: ['nintendo 64|\bn64\b'], exclude: ['\bjeu\b'], resale: 85}
+      - {key: snes, name: Super Nintendo, match: ['super nintendo|\bsnes\b'], exclude: ['mini'], resale: 85}
+      - {key: ds_lite, name: DS Lite, match: ['ds lite'], resale: 45}
+      - {key: n3ds, name: 3DS / New 3DS, match: ['\b3ds\b'], resale: 110}
+      - {key: pkmn_emerald, name: Pokémon Émeraude, match: ['pokemon emeraude|pokemon emerald'], resale: 110}
+      - {key: pkmn_hgss, name: Pokémon HeartGold/SoulSilver, match: ['heart ?gold|soul ?silver|or heartgold|argent soulsilver'], resale: 120}
+      - {key: pkmn_gb, name: Pokémon Rouge/Bleu/Jaune/Or/Argent/Cristal, match: ['pokemon (?:rouge|bleu|jaune|or|argent|cristal|crystal)\b'], resale: 45, generic: true}
+      - {key: pkmn_gba, name: Pokémon Rubis/Saphir/Rouge Feu/Vert Feuille, match: ['pokemon (?:rubis|saphir|rouge feu|vert feuille)'], resale: 60, generic: true}
+
+  pokemon_tcg:
+    name: "Cartes Pokémon & TCG"
+    emoji: "⚡"
+    description: "Lots de cartes, classeurs, ETB/displays scellés - les parents vendent les classeurs des enfants au kilo."
+    enabled_by_default: true
+    queries: [lot cartes pokemon, classeur pokemon, cartes pokemon anciennes, pokemon wizards, display pokemon, coffret dresseur elite,
+              etb pokemon, carte pokemon dracaufeu, one piece card game lot, lot cartes yu-gi-oh]
+    price_max: 400
+    shipping_eur: 4
+    min_profit: 20
+    authenticity_risk: high
+    collectible: true
+    model_guard:
+      - '\b(?:one piece|yu ?gi ?oh|lorcana|magic|dragon ball|naruto|digimon)\b'
+    components: []
+    alone: []
+    exclude: ['\bproxy\b', '\bcustom\b', '\bgold metal\b', '\bcarte doree\b', '\bfan made\b', '\bfausses?\b', '\bpochettes? vides?\b']
+    red_flags: [carte "dorée/métal" = fake, boosters "scellés" à 2€ = repack, photo de stock pour un display, lot de "cartes rares" sans photo du dos]
+    vision_checklist: [symbole d'extension et numéros, édition 1 / Shadowless (Wizards), centrage et coins, holo réel vs imprimé, film plastique (scellé usine vs refilmé)]
+    ai_hints: "Estime un lot carte par carte - les séries Wizards (1999-2002), Dracaufeu, cartes Alt Art et SIR valent cher. Un lot de 500 communes vaut ~10-15€."
+    models:
+      - {key: tcg_bulk_lot, name: Lot de cartes Pokémon, match: ['lot.*cartes? pokemon|cartes? pokemon.*lot|classeur pokemon'], resale: 40, generic: true}
+      - {key: tcg_wizards, name: Cartes Wizards 1999-2002, match: ['wizards|edition 1|shadowless|set de base|jungle|fossile|team rocket'], resale: 90, generic: true}
+      - {key: tcg_etb, name: Coffret Dresseur d'Élite (ETB), match: ['coffret dresseur (?:d )?elite|\betb\b'], resale: 60, new: 55}
+      - {key: tcg_display, name: Display 36 boosters, match: ['display.*(?:36|booster)'], resale: 170, new: 160}
+      - {key: tcg_dracaufeu, name: Carte Dracaufeu, match: ['dracaufeu|charizard'], resale: 60, generic: true}
+      - {key: onepiece_lot, name: Lot One Piece Card Game, match: ['one piece.*(?:card|carte)'], resale: 40, generic: true}
+
+  lego:
+    name: "LEGO"
+    emoji: "🧱"
+    description: "Sets complets, séries retirées, lots en vrac au kilo, minifigs."
+    queries: [lego star wars, lego technic, lego creator expert, lego icons, lego ideas, lego harry potter, lot lego vrac, lego minifigures lot,
+              lego ucs, lego neuf scelle]
+    price_max: 400
+    shipping_eur: 7
+    min_profit: 20
+    authenticity_risk: medium
+    collectible: true
+    components: [{name: notice, match: 'notices?', share: 0.08}, {name: minifigs, match: 'minifig\w*|personnages?|figurines?', share: 0.2}, {name: boîte, match: 'boite', share: 0.1}, {name: pièces, match: 'pieces?', share: 0.15}]
+    alone: []
+    exclude: ['\blepin\b', '\blele\b', '\bmould king\b', '\bcompatible\b', '\bpas lego\b', '\bduplo\b', '\bnotice seule\b', '\bboite vide\b']
+    red_flags: [marques compatibles (Lepin, Mould King) présentées comme LEGO, set "complet" sans notices ni photo de toutes les pièces]
+    vision_checklist: [logo LEGO sur les tenons, minifigs présentes, boîte scellée (scotch rond d'origine), jaunissement des pièces blanches]
+    ai_hints: "Le vrac se revend ~10-15€/kg, plus si minifigs. Les sets retirés (UCS, Modular, Ideas) prennent 30-80% après retrait."
+    models:
+      - {key: lego_vrac, name: LEGO vrac au kilo, match: ['lego.*(?:vrac|kg|kilo)', 'lot lego'], resale: 45, generic: true}
+      - {key: lego_ucs, name: LEGO Star Wars UCS, match: ['\bucs\b|ultimate collector'], resale: 350}
+      - {key: lego_modular, name: LEGO Modular, match: ['modular|creator expert'], resale: 160}
+      - {key: lego_technic, name: LEGO Technic grand set, match: ['lego technic'], resale: 90, generic: true}
+      - {key: lego_minifig, name: Lot minifigs LEGO, match: ['minifig'], resale: 35, generic: true}
+
+  film_cameras:
+    name: "Appareils argentiques"
+    emoji: "📷"
+    description: "Compacts et reflex argentiques - Mju II, T2, AE-1 : la tendance TikTok fait exploser les prix."
+    enabled_by_default: true
+    queries: [appareil photo argentique, olympus mju, olympus mju ii, contax t2, yashica t4, canon ae-1, pentax k1000, nikon fm2,
+              minolta x-700, canon prima, appareil photo jetable vintage, ricoh gr1, leica argentique]
+    price_max: 900
+    shipping_eur: 6
+    min_profit: 25
+    authenticity_risk: low
+    collectible: true
+    model_guard:
+      - '\b(?:digicam|numerique|digital|megapixels?|\d+ ?mp|ccd)\b'
+    components: [{name: objectif, match: 'objectifs?|optique', share: 0.4}]
+    alone: [{match: 'boitier nu|boitier seul|body only', missing: [objectif]}]
+    allow: ['\bhs\b']
+    exclude: ['\bpellicule seule\b', '\bjetable neuf\b', '\bnumerique\b', '\bobjectif seul\b']
+    red_flags: [non testé (souvent = cassé), oxydation compartiment piles, champignons dans l'objectif, flash HS sur compact]
+    vision_checklist: [lentille (rayures, champignons, buée), compartiment piles, écran LCD (compacts), mousses et joints, compteur de vues]
+    ai_hints: "Un vendeur qui dit \"appartenait à mon père, non testé\" vend souvent un appareil fonctionnel à 20-30% de sa valeur. Les compacts haut de gamme (T2, T4, Mju II, GR1) sont les plus rentables."
+    models:
+      - {key: mju_zoom, name: Olympus Mju Zoom (II/80/115/140), match: ['mju.*zoom|zoom.*mju|stylus (?:epic )?zoom'], resale: 80, generic: true}
+      - {key: mju2, name: Olympus Mju II, match: ['mju ?(?:ii|2)\b|stylus epic'], exclude: ['zoom'], resale: 220}
+      - {key: mju1, name: Olympus Mju I, match: ['\bmju\b'], exclude: ['ii', 'zoom', '2\b', '\b\d{3,4}\b'], resale: 120}
+      - {key: contax_t2, name: Contax T2, match: ['contax t2'], resale: 850}
+      - {key: yashica_t4, name: Yashica T4 / T5, match: ['yashica t[45]'], resale: 400}
+      - {key: canon_ae1, name: Canon AE-1 / AE-1 Program, match: ['\bae ?1\b'], resale: 150}
+      - {key: pentax_k1000, name: Pentax K1000, match: ['k ?1000'], resale: 140}
+      - {key: nikon_fm2, name: Nikon FM2 / FE2, match: ['\bf[me]2\b'], resale: 260}
+      - {key: minolta_x700, name: Minolta X-700, match: ['x ?700'], resale: 110}
+      - {key: ricoh_gr1, name: Ricoh GR1, match: ['ricoh gr ?1'], resale: 500}
+      - {key: canon_prima, name: Canon Prima / Sure Shot, match: ['canon (?:prima|sure shot)'], resale: 70, generic: true}
+
+  digital_cameras:
+    name: "Photo numérique"
+    emoji: "📸"
+    description: "Fujifilm X100, Ricoh GR, Canon G7X, Sony RX100, compacts Y2K."
+    queries: [fujifilm x100v, fujifilm x100f, fujifilm x100vi, ricoh gr iii, canon g7x, sony rx100, fujifilm xt30, sony a6000,
+              appareil photo numerique compact vintage, canon ixus, gopro hero 12]
+    price_max: 1500
+    shipping_eur: 7
+    min_profit: 40
+    authenticity_risk: medium
+    collectible: false
+    components: [{name: batterie, match: 'batteries?', share: 0.07}, {name: chargeur, match: 'chargeur', share: 0.04}, {name: objectif, match: 'objectifs?', share: 0.35}, {name: boîte, match: 'boite', share: 0.03}]
+    alone: [{match: 'boitier nu|boitier seul|body only', missing: [objectif]}]
+    exclude: ['\bbatterie seule\b', '\bhousse\b', '\bchargeur seul\b', '\bobjectif seul\b', '\bfiltre\b']
+    red_flags: [nombre de déclenchements non indiqué, capteur poussiéreux, écran rayé, pas de chargeur]
+    vision_checklist: [écran arrière, objectif et bague, capteur, griffes et coins, accessoires]
+    models:
+      - {key: x100vi, name: Fujifilm X100VI, match: ['x100 ?vi\b'], resale: 1550, new: 1799}
+      - {key: x100v, name: Fujifilm X100V, match: ['x100 ?v\b'], resale: 1250}
+      - {key: x100f, name: Fujifilm X100F, match: ['x100 ?f\b'], resale: 750}
+      - {key: ricoh_gr3, name: Ricoh GR III / IIIx, match: ['ricoh gr ?(?:iii|3)'], resale: 900, new: 1099}
+      - {key: g7x, name: Canon G7X (II/III), match: ['g7 ?x'], resale: 450, new: 799}
+      - {key: rx100, name: Sony RX100, match: ['rx ?100'], resale: 300}
+      - {key: xt30, name: Fujifilm X-T30, match: ['x ?t30'], resale: 550}
+      - {key: a6000, name: Sony A6000/A6100, match: ['a6[01]00'], resale: 330}
+      - {key: ixus, name: Canon Ixus / Powershot Y2K, match: ['\bixus\b'], resale: 70, generic: true}
+      - {key: gopro12, name: GoPro Hero 11-13, match: ['gopro hero ?1[1-3]'], resale: 230, new: 399}
+
+  audio:
+    name: "Audio & hi-fi"
+    emoji: "🎧"
+    description: "Casques premium, iPod, platines vinyle, enceintes Marshall."
+    queries: [sony wh-1000xm5, sony wh-1000xm4, bose quietcomfort, ipod classic, ipod nano, technics sl-1200, platine vinyle,
+              marshall enceinte, bang olufsen, sonos]
+    price_max: 900
+    shipping_eur: 6
+    min_profit: 25
+    authenticity_risk: medium
+    collectible: false
+    model_guard:
+      - '\b(?:coussinets?|ear ?pads?|cable|housse|etui|support)\b'
+    components: [{name: câble, match: 'cables?', share: 0.03}, {name: étui, match: 'etui|housse', share: 0.05}, {name: cellule/diamant, match: 'cellule|diamant', share: 0.12}, {name: boîte, match: 'boite', share: 0.03}]
+    alone: []
+    exclude: ['\bcoussinets? seuls?\b', '\bcable seul\b', '\bhousse seule\b', '\bdiamant seul\b']
+    red_flags: [casque Sony/Bose "neuf" très bas = fake, iPod "refurb" avec batterie chinoise, platine sans cellule]
+    vision_checklist: [arceau (fissures), coussinets, numéro de série, accessoires, écran iPod]
+    models:
+      - {key: xm5, name: Sony WH-1000XM5, match: ['xm5'], resale: 210, new: 399}
+      - {key: xm4, name: Sony WH-1000XM4, match: ['xm4'], resale: 150}
+      - {key: bose_qc, name: Bose QuietComfort, match: ['bose.*(?:quiet ?comfort|qc ?(?:35|45|ultra))'], resale: 150, new: 349, generic: true}
+      - {key: ipod_classic, name: iPod Classic, match: ['ipod classic|ipod video'], resale: 110}
+      - {key: ipod_nano, name: iPod Nano, match: ['ipod nano'], resale: 35}
+      - {key: sl1200, name: Technics SL-1200/1210, match: ['sl ?12[01]0'], resale: 600, new: 1199}
+      - {key: marshall, name: Enceinte Marshall, match: ['marshall.*(?:enceinte|speaker|stanmore|acton|woburn|emberton)'], resale: 120, new: 249, generic: true}
+      - {key: sonos, name: Sonos, match: ['sonos'], resale: 150, new: 499, generic: true}
+
+  watches:
+    name: "Montres"
+    emoji: "⌚"
+    description: "Seiko, Casio vintage, Tissot PRX, Swatch - petites montres, gros multiplicateurs."
+    queries: [montre seiko automatique, seiko 5, seiko skx, casio g-shock, casio vintage, tissot prx, swatch vintage, montre vintage homme,
+              omega montre, longines montre]
+    price_max: 900
+    shipping_eur: 5
+    min_profit: 25
+    authenticity_risk: very_high
+    collectible: true
+    model_guard:
+      - '\b(?:bracelet seul|strap|boite seule|maillons?)\b'
+    components: [{name: boîte/papiers, match: 'boite|papiers|certificat|carte de garantie', share: 0.12}, {name: bracelet d'origine, match: 'bracelet d origine', share: 0.08}]
+    alone: []
+    exclude: ['\bbracelet seul\b', '\bboite seule\b', '\bpile\b seule', '\bconnectee\b', '\bsmartwatch\b', '\benfant\b']
+    red_flags: [Omega/Rolex/Longines à petit prix = fake quasi certain, cadran "redial", fond de boîte sans gravures, mouvement non visible]
+    vision_checklist: [cadran (impression, alignement), fond de boîte et numéros, couronne, verre, mouvement si visible]
+    ai_hints: "Les montres de luxe à petit prix sont presque toujours fausses - ne recommande l'achat que si les photos sont très convaincantes. Seiko SKX/5 et Tissot PRX sont des valeurs sûres."
+    models:
+      - {key: seiko_skx, name: Seiko SKX007/009/013, match: ['skx ?0(?:07|09|13)'], resale: 300}
+      - {key: seiko5, name: Seiko 5 automatique, match: ['seiko 5\b|seiko.*automati'], resale: 110, new: 300, generic: true}
+      - {key: gshock, name: Casio G-Shock, match: ['g ?shock'], resale: 70, new: 120, generic: true}
+      - {key: casio_vintage, name: Casio vintage (A168, F91...), match: ['casio.*(?:a168|f91|a158|vintage|ae1200)'], resale: 25, generic: true}
+      - {key: tissot_prx, name: Tissot PRX, match: ['tissot prx'], resale: 260, new: 450}
+      - {key: omega, name: Omega, match: ['\bomega\b'], resale: 900, generic: true}
+      - {key: longines, name: Longines, match: ['\blongines\b'], resale: 500, generic: true}
+
+  home_premium:
+    name: "Maison premium"
+    emoji: "🏠"
+    description: "Dyson, Thermomix, Le Creuset, KitchenAid, Smeg - les déménagements créent des affaires."
+    queries: [dyson airwrap, dyson v11, dyson v15, dyson supersonic, thermomix tm6, thermomix tm5, le creuset cocotte, kitchenaid artisan,
+              smeg, nespresso vertuo, moulinex cookeo]
+    price_max: 900
+    shipping_eur: 10
+    min_profit: 30
+    authenticity_risk: high
+    collectible: false
+    model_guard:
+      - '\b(?:accessoires? seuls?|embout|brosse|filtre|batterie seule|support mural|pieces?)\b'
+    components: [{name: accessoires/embouts, match: 'accessoires|embouts|brosses|tetes|suceurs?', share: 0.18}, {name: batterie, match: 'batterie', share: 0.3}, {name: chargeur, match: 'chargeur|cable', share: 0.07}, {name: Cook-Key, match: 'cook ?key', share: 0.1}, {name: boîte, match: 'boite', share: 0.03}]
+    alone: []
+    exclude: ['\baccessoires? seuls?\b', '\bfiltre seul\b', '\bbatterie seule\b', '\bembout seul\b', '\bbrosse seule\b', '\bcouvercle seul\b']
+    red_flags: [Airwrap/Supersonic à < 50% = fake très fréquent, Thermomix sans puce Cook-Key, Dyson batterie morte]
+    vision_checklist: [numéro de série, logo et finitions (Dyson), accessoires inclus, état batterie / tête, émail (Le Creuset)]
+    models:
+      - {key: airwrap, name: Dyson Airwrap, match: ['airwrap'], resale: 330, new: 549}
+      - {key: supersonic, name: Dyson Supersonic, match: ['supersonic'], resale: 230, new: 449}
+      - {key: dyson_v15, name: Dyson V15, match: ['dyson v ?15'], resale: 380, new: 699}
+      - {key: dyson_v11, name: Dyson V11, match: ['dyson v ?11'], resale: 230}
+      - {key: tm6, name: Thermomix TM6, match: ['tm ?6\b'], resale: 900}
+      - {key: tm5, name: Thermomix TM5, match: ['tm ?5\b'], resale: 450}
+      - {key: le_creuset, name: Cocotte Le Creuset, match: ['le creuset'], resale: 90, new: 299, generic: true}
+      - {key: kitchenaid, name: KitchenAid Artisan, match: ['kitchen ?aid'], resale: 260, new: 599}
+
+  luxury:
+    name: "Luxe (vérif. renforcée)"
+    emoji: "💎"
+    description: "Maroquinerie & accessoires de luxe. Profits énormes mais risque de fake maximal - analyse IA systématique."
+    queries: [sac louis vuitton, sac gucci, foulard hermes, carre hermes, ceinture hermes, sac longchamp le pliage, sac chanel,
+              lunettes ray-ban, sac prada, sac celine]
+    price_max: 2000
+    shipping_eur: 8
+    min_profit: 60
+    authenticity_risk: very_high
+    collectible: false
+    components: [{name: dustbag, match: 'dust ?bag|pochon', share: 0.04}, {name: boîte, match: 'boite', share: 0.04}, {name: facture/certificat, match: 'facture|certificat|ticket', share: 0.05}, {name: sangle/bandoulière, match: 'sangle|bandouliere|chaine', share: 0.12}, {name: cadenas/clé, match: 'cadenas|cles?', share: 0.04}]
+    alone: []
+    exclude: ['\bstyle\b', '\binspire\b', '\bfacon\b', '\btype (?:lv|chanel|hermes)\b', '\bdustbag seul\b', '\bboite seule\b', '\bcabas\b imitation']
+    red_flags: [prix < 30% de la cote = fake, pas de date code / numéro de série, photos de stock, vendeur 0 avis, dustbag "offert" mis en avant]
+    vision_checklist: [date code / numéro de série, alignement du monogramme, coutures (nombre et régularité), quincaillerie gravée, intérieur et étiquette made in]
+    ai_hints: "Sois extrêmement sceptique. Ne recommande BUY que si les photos montrent les points d'authentification clés. Longchamp Le Pliage et foulards Hermès vintage sont les meilleures opportunités réelles."
+    models:
+      - {key: lv_speedy, name: Louis Vuitton Speedy, match: ['speedy'], resale: 550, new: 1650}
+      - {key: lv_neverfull, name: Louis Vuitton Neverfull, match: ['neverfull'], resale: 900, new: 2100}
+      - {key: lv_pochette, name: LV Pochette Accessoires/Métis, match: ['louis vuitton.*pochette|pochette (?:metis|accessoires)'], resale: 600, new: 1300, generic: true}
+      - {key: hermes_carre, name: Carré Hermès 90, match: ['(?:carre|foulard).*hermes|hermes.*(?:carre|foulard)'], resale: 230, new: 520}
+      - {key: hermes_belt, name: Ceinture Hermès H, match: ['ceinture.*hermes|hermes.*ceinture'], resale: 450, new: 950}
+      - {key: longchamp_pliage, name: Longchamp Le Pliage, match: ['pliage'], resale: 60, new: 145}
+      - {key: rayban, name: Ray-Ban (Wayfarer/Aviator), match: ['ray ?ban'], resale: 60, new: 179, generic: true}
+
+  football_shirts:
+    name: "Maillots de foot vintage"
+    emoji: "⚽"
+    description: "Maillots rétro authentiques 90s-2000s - énorme demande collectionneurs."
+    queries: [maillot foot vintage, maillot psg vintage, maillot om vintage, maillot retro football, maillot france 1998,
+              maillot ac milan vintage, maillot arsenal vintage, maillot real madrid vintage]
+    price_max: 200
+    shipping_eur: 4.5
+    min_profit: 20
+    authenticity_risk: high
+    collectible: true
+    components: []
+    alone: []
+    exclude: ['\benfant\b', '\bkids\b', '\breedition\b', '\bremake\b', '\bfan version\b', '\bversion thai\b', '\bthailande\b']
+    red_flags: [étiquette produit absente, flocage imprimé au lieu de feutrine (90s), coupe "slim" moderne sur un maillot 90s, logo sponsor approximatif]
+    vision_checklist: [étiquette intérieure (code produit), écusson (brodé vs imprimé), sponsor, coutures, tags de taille]
+    models:
+      - {key: shirt_90s_psg, name: Maillot PSG années 90, match: ['psg.*(?:199\d|90s|vintage|retro)|(?:199\d|vintage|retro).*psg'], resale: 110}
+      - {key: shirt_90s_om, name: Maillot OM années 90, match: ['\bom\b.*(?:199\d|vintage|retro)|marseille.*(?:199\d|vintage)'], resale: 100}
+      - {key: shirt_fr98, name: Maillot France 1998, match: ['france.*1998|98.*france'], resale: 120}
+      - {key: shirt_vintage, name: Maillot vintage (générique), match: ['maillot.*(?:vintage|retro|199\d|200[0-6])'], resale: 55, generic: true}

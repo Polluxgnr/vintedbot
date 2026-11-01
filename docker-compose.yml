@@ -1,0 +1,10 @@
+services:
+  hunter:
+    build: .
+    env_file: .env
+    volumes:
+      - hunter-data:/data            # market memory, alerts, portfolio
+      - ./config:/app/config:ro      # edit niches.yaml without rebuilding
+    restart: unless-stopped
+volumes:
+  hunter-data:

@@ -2,40 +2,23 @@
 .env
 .env.*
 !.env.example
-*.pem
 
 # Python
-*.pyc
-*.pyo
 __pycache__/
-*.egg-info/
-.eggs/
-dist/
-build/
+*.pyc
 .pytest_cache/
-.mypy_cache/
-.ruff_cache/
-htmlcov/
-.coverage
-coverage.xml
+*.egg-info/
 
-# Virtual environments
-.venv/
-venv/
-env/
+# Local data
+data/
+*.db
+*.db-shm
+*.db-wal
 
-# IDE / editor
-.cursor/
-.vscode/
-.idea/
-*.swp
-*.swo
-.DS_Store
-Thumbs.db
+# Old Selenium/Streamlit draft and third-party reference clones (not part of this project)
+tests/
 
-# Local run data (cookies, logs, caches, exports)
-brouillon/data/
-bench_out/
-
-# Logs
-*.log
+# Google Drive shortcuts
+*.gdoc
+*.gsheet
+*.gslides
