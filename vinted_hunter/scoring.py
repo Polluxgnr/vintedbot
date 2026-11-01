@@ -105,6 +105,13 @@ def score_parts(listing: Listing, valuation: Valuation, profit_eur: float | None
         p["arnaque probable"] = -30
     if insp.missing:
         p["pièces manquantes"] = -3 * len(insp.missing)   # value already reduced; this is for uncertainty
+    if insp.verification:
+        # Vinted can check the item (authenticity / electronics) before it reaches you: fakes become refundable.
+        p["vérification Vinted dispo"] = 5
+    if insp.missing_specs and not (verdict and verdict.specs):
+        p["specs non précisées"] = -3 * len(insp.missing_specs)
+    if verdict and verdict.specs_consistent is False:
+        p["specs incohérentes (IA)"] = -12
     if verdict:
         p["risque fake (IA)"] = -35 * verdict.authenticity_risk
         if not verdict.relevant:
@@ -205,10 +212,15 @@ def gate_fails(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: Searc
         fails.append("vendeur risqué")
     if vr and (not vr.relevant or vr.recommendation is Recommendation.SKIP or vr.authenticity_risk >= 0.5):
         fails.append("rejeté par l'IA")
+    if insp and insp.missing_specs and not (vr and vr.specs):
+        fails.append("specs à vérifier : " + ", ".join(insp.missing_specs) + " non précisé(s)")
+    if vr and vr.specs_consistent is False:
+        fails.append("specs incohérentes entre titre, description et photos")
     if niche and not (vr and vr.tier >= 3):
         if niche.authenticity_risk == "very_high":
             fails.append("niche à contrefaçons : vérification photo IA obligatoire")
-        elif niche.authenticity_risk == "high" and (not sc or sc.level != "ok" or l.price < v.fair_value * 0.45):
+        elif (niche.authenticity_risk == "high" and not (insp and insp.verification)
+              and (not sc or sc.level != "ok" or l.price < v.fair_value * 0.45)):
             fails.append("niche à contrefaçons : vendeur 🟢 et prix ≥ 45 % de la cote exigés sans IA")
     if require_market:
         mc = deal.market_check

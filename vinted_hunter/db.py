@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS price_obs (
     listing_id INTEGER, niche_id TEXT, model_key TEXT, condition INTEGER, price REAL, observed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_obs_model ON price_obs(model_key, observed_at);
+CREATE INDEX IF NOT EXISTS ix_obs_time ON price_obs(observed_at);
+CREATE INDEX IF NOT EXISTS ix_listings_seen ON listings(first_seen);
 
 CREATE TABLE IF NOT EXISTS verdicts (
     listing_id INTEGER PRIMARY KEY, tier INTEGER, data TEXT, updated_at TEXT
@@ -103,6 +105,7 @@ class Database:
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA synchronous=NORMAL")
+        await self._conn.execute("PRAGMA busy_timeout=15000")   # bot + CLI can share the file safely
         await self._conn.executescript(SCHEMA)
         cols = {r[1] for r in await (await self._conn.execute("PRAGMA table_info(model_stats)")).fetchall()}
         if "upper_calibrated" not in cols:

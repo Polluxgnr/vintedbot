@@ -59,6 +59,9 @@ avouent ce qui manque ("je garde les manettes", "sans chargeur") ou les défauts
 - missing: pièces/accessoires PHYSIQUES normalement fournis mais ABSENTS (ex: ["manettes", "dock"]). Jamais de photos manquantes ni de "non vérifiable" ici (mets-les dans red_flags)
 - adjust_pct: décote en % (négatif) due aux pièces manquantes et défauts de CET article, 0 si complet et sans défaut
 - authenticity_risk: 0 à 1 (prix trop bas, formulation louche, signaux de fake)
+- specs: caractéristiques qui font le prix, lues dans le titre ET la description (ex: {{"stockage": "256 Go",
+  "batterie": "89 %", "processeur": "i5-8500T", "ram": "16 Go"}}), {{}} si aucune
+- specs_consistent: false si titre et description se contredisent (ex: titre 256 Go, description 128 Go), sinon true
 - seller_ok: false si le vendeur semble douteux (nouveau compte + prix trop bas, contact hors Vinted, texte copié...)
 - red_flags: liste courte (max 3) en français
 - note: 1 phrase max
@@ -80,6 +83,8 @@ Valeur de revente estimée par le marché: {valuation_hint or 'inconnue'} €.
 Examine les photos jointes. Points à vérifier:
 {checklist}
 
+VÉRIFIE LES SPECS : stockage, batterie, processeur, RAM, modèle exact — compare titre, description et ce qui est
+visible sur les photos (captures « Réglages », « À propos », étiquettes, boîte). Toute contradiction = specs_consistent false.
 Vérifie aussi ce qui est VISIBLE sur les photos : accessoires présents ou absents (manettes, dock, chargeur, boîte...).
 resale_eur = prix de revente du modèle COMPLET en très bon état ; adjust_pct = décote (négative) pour CET article.
 
@@ -87,6 +92,7 @@ Réponds en JSON:
 {{"model": "modèle exact visible", "matches_listing": true, "condition_score": 0-10, "defects": ["..."],
 "missing": ["pièces PHYSIQUES absentes, pas les photos manquantes"], "adjust_pct": -20, "authenticity_risk": 0-1, "authenticity_notes": "...",
 "completeness": "ce qui est présent", "resale_eur": nombre, "new_price_eur": nombre|null,
+"specs": {{"stockage": "...", "batterie": "..."}}, "specs_consistent": true,
 "positives": ["..."], "red_flags": ["..."], "summary": "2 phrases max"}}"""
 
 

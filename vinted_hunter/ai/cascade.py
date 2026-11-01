@@ -96,6 +96,8 @@ class AICascade:
                     adjust_pct=_pct(row.get("adjust_pct")),
                     new_price=_num(row.get("new_price_eur")),
                     seller_ok=row.get("seller_ok") if isinstance(row.get("seller_ok"), bool) else None,
+                    specs={str(k): str(v) for k, v in (row.get("specs") or {}).items() if v} if isinstance(row.get("specs"), dict) else {},
+                    specs_consistent=row.get("specs_consistent") if isinstance(row.get("specs_consistent"), bool) else None,
                     cost_usd=share,
                 )
         return out
@@ -164,6 +166,10 @@ class AICascade:
             v.new_price = newp
         if isinstance(data.get("seller_ok"), bool):
             v.seller_ok = data["seller_ok"]
+        if isinstance(data.get("specs"), dict) and data["specs"]:
+            v.specs = {**v.specs, **{str(k): str(val) for k, val in data["specs"].items() if val}}
+        if isinstance(data.get("specs_consistent"), bool):
+            v.specs_consistent = data["specs_consistent"] if v.specs_consistent is not False else False
         v.positives = _merge_list(v.positives, data.get("positives"))
         if data.get("completeness"):
             v.positives = _merge_list(v.positives, [f"Complet: {data['completeness']}"])

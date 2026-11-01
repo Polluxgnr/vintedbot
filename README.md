@@ -44,6 +44,17 @@ An alert fires only when **every** check passes:
 
 Every card says what blocked it (🚫), and 🔍 *Détail du calcul* shows each number and check.
 
+## Specs & Vinted verification
+
+- **Specs:** storage, RAM, CPU and battery health are read from the title and description. When a spec that drives the price is missing (e.g. storage on a phone, CPU/RAM on a mini PC), the card shows *"À demander au vendeur"*. That listing can't be a pépite until the AI confirms the specs. The AI also cross-checks title, description and photos (settings screenshots, labels): a contradiction blocks the pépite.
+- **Vinted verification:** electronics and luxury/designer items above the eligibility price are marked *"Vérification Vinted probablement dispo"* (+5 score). This is Vinted's optional paid check, to confirm at checkout. In fake-prone niches, it can replace the photo-check requirement.
+
+## Database that grows and learns
+
+- **Harvester:** every request not needed for the live feeds crawls all 18 niches and ~260 catalog models (cheapest first, several pages). Everything goes into price memory and sales tracking, at no AI cost. For a one-off big run, use `python -m vinted_hunter harvest --minutes 60` (stop the bot first so they don't share the request budget).
+- **Calibration:** every 6 h, each model's price is relearned from 30 days of observations and confirmed sales. Fake-prone niches use the upper part of the market. Learnt prices are bounded between −40 % and +50 % of the seed price, and 7-day trends are tracked.
+- **Niche study:** `/etude` in Telegram, or `python -m vinted_hunter study --json study.json`. It ranks niches and models by opportunity: deals per day × typical profit, weighted by fake risk and price homogeneity. Each model is measured against its own observed market.
+
 ## Sales database
 
 Vinted doesn't publish sales, so the bot tracks identified listings and re-checks them (6 every 10 min) to see whether they sold, were reserved, disappeared or dropped in price. This gives, per model:

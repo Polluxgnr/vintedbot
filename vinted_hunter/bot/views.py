@@ -25,6 +25,7 @@ REC_LABELS = {
 }
 
 
+_SPEC_FR = {"storage": "stockage", "ram": "RAM", "cpu": "processeur", "battery": "santé batterie"}
 # AI "missing" items that are about evidence, not physical parts
 _META_MISSING = re.compile(r"photo|visible|verifi|vérifi|montr|éventuel|eventuel|preuve|ticket|facture|confirmer")
 
@@ -50,7 +51,8 @@ def main_menu() -> Kb:
         [Btn("🎯 Niches", callback_data="m:niches"), Btn("👁 Mes alertes", callback_data="m:watches")],
         [Btn("💶 Prix du marché", callback_data="m:price"), Btn("🏆 Radar / Top", callback_data="m:top")],
         [Btn("💼 Portefeuille", callback_data="m:pf"), Btn("📊 Stats", callback_data="m:stats")],
-        [Btn("⚙️ Réglages", callback_data="m:settings"), Btn("ℹ️ Comment ça marche", callback_data="m:help")],
+        [Btn("📊 Étude des niches", callback_data="m:study"), Btn("⚙️ Réglages", callback_data="m:settings")],
+        [Btn("ℹ️ Comment ça marche", callback_data="m:help")],
     ])
 
 
@@ -196,6 +198,16 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
         lines.append("🧩 <b>Incomplet</b> : " + e(", ".join(missing[:3])))
     if insp and insp.defects:
         lines.append("🔧 " + e(", ".join(f"{f.label} (−{f.impact * 100:.0f}%)" for f in insp.defects[:3])))
+    specs = {**(insp.specs if insp else {}), **(vr.specs if vr else {})}
+    if specs:
+        lines.append("🔧 Specs : " + e(" · ".join(f"{v_}" for v_ in list(specs.values())[:4])))
+    if insp and insp.missing_specs and not (vr and vr.specs):
+        lines.append("⚠️ À demander au vendeur : " + e(", ".join(_SPEC_FR.get(s, s) for s in insp.missing_specs)))
+    if vr and vr.specs_consistent is False:
+        lines.append("⚠️ Specs incohérentes (titre/description/photos)")
+    if insp and insp.verification:
+        lines.append("🛡 Vérification Vinted " + ("électronique" if insp.verification == "electronics" else "d'authenticité")
+                     + " probablement dispo (option payante, à confirmer au paiement)")
     if d.profit is not None:
         label = "Économie vs cote" if personal else "Profit net"
         lines.append(f"💰 {label} <b>{d.profit:+.0f} €</b> ({d.margin_pct:+.0f}%)")

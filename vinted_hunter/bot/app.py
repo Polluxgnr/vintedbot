@@ -187,7 +187,7 @@ class HunterBot:
             "start": self.cmd_start, "menu": self.cmd_start, "niches": self.show_niches, "watches": self.show_watches,
             "analyze": self.cmd_analyze, "price": self.cmd_price, "stats": self.show_stats, "top": self.show_top,
             "portfolio": self.show_portfolio, "settings": self.show_settings, "help": self.show_help,
-            "aide": self.show_help,
+            "aide": self.show_help, "etude": self.show_study,
         }.items():
             app.add_handler(CommandHandler(name, fn))
 
@@ -217,6 +217,7 @@ class HunterBot:
             BotCommand("watches", "Mes alertes"), BotCommand("top", "Radar : toutes les bonnes affaires, triables"),
             BotCommand("portfolio", "Achats / ventes / profit"), BotCommand("stats", "Statistiques & coût IA"),
             BotCommand("settings", "Réglages"), BotCommand("aide", "Comment sont calculés cote, confiance, score"),
+            BotCommand("etude", "Étude des niches les plus rentables"),
             BotCommand("menu", "Menu principal"),
         ])
         app.bot_data["loop"] = asyncio.create_task(self.hunter.run_forever(self.notify))
@@ -612,7 +613,7 @@ class HunterBot:
     async def on_menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         action = update.callback_query.data.split(":")[1]
         handler = {"niches": self.show_niches, "watches": self.show_watches, "analyze": self.cmd_analyze,
-                   "help": self.show_help,
+                   "help": self.show_help, "study": self.show_study,
                    "price": self.cmd_price, "stats": self.show_stats, "top": self.show_top,
                    "pf": self.show_portfolio, "settings": self.show_settings}.get(action)
         if handler:
@@ -699,6 +700,16 @@ class HunterBot:
             await q.message.edit_text(text, reply_markup=kb)
         except BadRequest:
             pass
+
+    async def show_study(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        from ..study import format_study, niche_study
+
+        msg = await self._reply(update, "📊 Analyse de la base de données…")
+        study = await niche_study(self.db, self.sv.niches)
+        try:
+            await msg.edit_text(format_study(study))
+        except TelegramError:
+            await update.effective_chat.send_message(format_study(study))
 
     async def show_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await self._reply(update, v.HELP_INTRO, reply_markup=v.help_keyboard())

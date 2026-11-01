@@ -16,6 +16,8 @@ defaults:
 niches:
 
   sneakers:
+    vinted_verification: authenticity
+    verification_min_price: 100
     name: "Sneakers cotées"
     emoji: "👟"
     description: "Dunk, Jordan, New Balance, Asics, Salomon, Samba - liquides et faciles à revendre."
@@ -56,6 +58,8 @@ niches:
       - {key: airmax1, name: Nike Air Max 1, match: ['air ?max 1\b'], resale: 70, new: 150}
 
   outdoor_premium:
+    vinted_verification: authenticity
+    verification_min_price: 150
     name: "Outdoor premium"
     emoji: "🏔️"
     description: "Arc'teryx, The North Face, Patagonia - forte demande, vendeurs qui sous-estiment."
@@ -88,11 +92,13 @@ niches:
       - {key: better_sweater, name: Patagonia Better Sweater, match: ['better sweater'], resale: 55, new: 150}
       - {key: moncler_maya, name: Moncler doudoune (Maya, Montclar...), match: ['moncler.*(?:doudoune|maya|montclar|jacket|veste)'], resale: 550}
       - {key: canada_goose, name: Canada Goose parka, match: ['canada goose'], resale: 450}
-      - {key: tnf_himalayan, name: TNF Himalayan / 700 Retro, match: ['himalayan|north face.*700'], resale: 160}
+      - {key: tnf_himalayan, name: TNF Himalayan / 700 Retro, match: ['himalayan'], exclude: ['nuptse'], resale: 160}
       - {key: arc_gamma, name: Arc'teryx Gamma, match: ['arc ?teryx.*gamma'], resale: 180}
       - {key: salomon_veste, name: Salomon veste technique, match: ['salomon.*(?:veste|jacket|gore)'], resale: 80, generic: true}
 
   streetwear_designer:
+    vinted_verification: authenticity
+    verification_min_price: 100
     name: "Streetwear & designer"
     emoji: "🧥"
     description: "Stone Island, C.P. Company, Carhartt WIP, Ralph Lauren vintage, Lacoste."
@@ -132,6 +138,9 @@ niches:
       - {key: carhartt_og_active, name: Carhartt WIP OG Active / Arctic, match: ['carhartt.*(?:og active|arctic)'], resale: 110}
 
   apple_tech:
+    vinted_verification: electronics
+    verification_min_price: 50
+    required_specs: [storage]
     name: "Apple & tech"
     emoji: "🍏"
     description: "AirPods, iPad, MacBook, Apple Watch - les particuliers bradent, mais attention aux fakes et iCloud."
@@ -183,6 +192,8 @@ niches:
       - {key: watch_s8, name: Apple Watch Series 8-10 / Ultra, match: ['apple watch.*(series (?:8|9|10)|ultra)'], resale: 230, new: 449, generic: true}
 
   consoles:
+    vinted_verification: electronics
+    verification_min_price: 50
     name: "Consoles récentes"
     emoji: "🎮"
     description: "Switch, PS5, Steam Deck, Xbox - volume énorme, revente en 24h."
@@ -231,6 +242,8 @@ niches:
       - {key: quest3, name: Meta Quest 3, match: ['quest 3\b'], exclude: ['3s'], resale: 360, new: 549}
 
   retro_gaming:
+    vinted_verification: electronics
+    verification_min_price: 50
     name: "Retro gaming"
     emoji: "👾"
     description: "Game Boy, GameCube, N64, jeux Pokémon - les greniers regorgent de pépites mal pricées."
@@ -354,6 +367,8 @@ niches:
       - {key: canon_prima, name: Canon Prima / Sure Shot, match: ['canon (?:prima|sure shot)'], resale: 70, generic: true}
 
   digital_cameras:
+    vinted_verification: electronics
+    verification_min_price: 50
     name: "Photo numérique"
     emoji: "📸"
     description: "Fujifilm X100, Ricoh GR, Canon G7X, Sony RX100, compacts Y2K."
@@ -394,6 +409,8 @@ niches:
       - {key: kindle_pw, name: Kindle Paperwhite / Oasis, match: ['kindle (?:paperwhite|oasis)'], resale: 80, generic: true}
 
   audio:
+    vinted_verification: electronics
+    verification_min_price: 50
     name: "Audio & hi-fi"
     emoji: "🎧"
     description: "Casques premium, iPod, platines vinyle, enceintes Marshall."
@@ -428,6 +445,8 @@ niches:
       - {key: galaxy_buds, name: Galaxy Buds 2 Pro / 3 Pro, match: ['galaxy buds ?(?:2 pro|3 pro)'], resale: 100}
 
   watches:
+    vinted_verification: authenticity
+    verification_min_price: 100
     name: "Montres"
     emoji: "⌚"
     description: "Seiko, Casio vintage, Tissot PRX, Swatch - petites montres, gros multiplicateurs."
@@ -484,6 +503,8 @@ niches:
       - {key: kitchenaid, name: KitchenAid Artisan, match: ['kitchen ?aid'], resale: 260, new: 599}
 
   luxury:
+    vinted_verification: authenticity
+    verification_min_price: 100
     name: "Luxe (vérif. renforcée)"
     emoji: "💎"
     description: "Maroquinerie & accessoires de luxe. Profits énormes mais risque de fake maximal - analyse IA systématique."
@@ -542,6 +563,9 @@ niches:
       - {key: shirt_vintage, name: Maillot vintage (générique), match: ['maillot.*(?:vintage|retro|199\d|200[0-6])'], resale: 55, generic: true}
 
   mini_pc_homelab:
+    vinted_verification: electronics
+    verification_min_price: 50
+    required_specs: [cpu,ram,storage]
     name: "Mini PC & homelab"
     emoji: "🖥️"
     description: "Mac mini, NUC, ThinkCentre Tiny, Raspberry Pi, Jetson, NAS - pour héberger IA et projets cloud chez soi. Les particuliers les bradent après un déménagement."
@@ -579,6 +603,9 @@ niches:
       - {key: synology, name: NAS Synology (DS2xx+/DS9xx+), match: ['synology'], resale: 220, generic: true}
 
   pc_hardware:
+    vinted_verification: electronics
+    verification_min_price: 50
+    required_specs: [cpu,ram,storage]
     name: "Informatique & cartes graphiques"
     emoji: "💻"
     description: "GPU, CPU, PC portables pro : forte valeur, vendeurs pressés, beaucoup d'erreurs de prix."
@@ -601,24 +628,27 @@ niches:
     vision_checklist: [connecteurs PCIe et alimentation (brûlures), ventilateurs et pâte thermique, étiquette numéro de série, capture GPU-Z / benchmark, état écran et clavier (portables)]
     ai_hints: "Les GPU de minage ne sont pas forcément mauvais mais valent 10-15 % de moins. Une RTX 4090 à moins de 1000 € est presque toujours une arnaque. Pour les portables, la config (CPU, RAM, SSD, écran) fait la valeur."
     models:
-      - {key: rtx3060ti, name: RTX 3060 Ti, match: ['3060 ?ti'], resale: 210}
-      - {key: rtx3060, name: RTX 3060, match: ['rtx ?3060'], exclude: ['\bti\b'], resale: 190}
-      - {key: rtx3070, name: RTX 3070 / Ti, match: ['rtx ?3070'], resale: 260}
-      - {key: rtx3080, name: RTX 3080 / Ti, match: ['rtx ?3080'], resale: 380}
-      - {key: rtx3090, name: RTX 3090 / Ti, match: ['rtx ?3090'], resale: 620}
-      - {key: rtx4060, name: RTX 4060 / Ti, match: ['rtx ?4060'], resale: 240, new: 320}
-      - {key: rtx4070s, name: RTX 4070 Super / Ti, match: ['rtx ?4070 ?(?:super|ti)'], resale: 520, new: 650}
-      - {key: rtx4070, name: RTX 4070, match: ['rtx ?4070'], exclude: ['super', '\bti\b'], resale: 430, new: 600}
-      - {key: rtx4080, name: RTX 4080 / Super, match: ['rtx ?4080'], resale: 780, new: 1050}
-      - {key: rtx4090, name: RTX 4090, match: ['rtx ?4090'], resale: 1500, new: 1900}
-      - {key: rx6800, name: RX 6800 / XT, match: ['rx ?6800'], resale: 330}
-      - {key: rx7800, name: RX 7800 XT, match: ['rx ?7800'], resale: 400, new: 520}
-      - {key: r5800x3d, name: Ryzen 7 5800X3D, match: ['5800 ?x3d'], resale: 230}
-      - {key: r7800x3d, name: Ryzen 7 7800X3D, match: ['7800 ?x3d'], resale: 330, new: 420}
+      - {key: rtx3060ti, name: RTX 3060 Ti, match: ['3060 ?ti'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 210}
+      - {key: rtx3060, name: RTX 3060, match: ['rtx ?3060'], exclude: ['\bti\b', '\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 190}
+      - {key: rtx3070, name: RTX 3070 / Ti, match: ['rtx ?3070'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 260}
+      - {key: rtx3080, name: RTX 3080 / Ti, match: ['rtx ?3080'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 380}
+      - {key: rtx3090, name: RTX 3090 / Ti, match: ['rtx ?3090'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 620}
+      - {key: rtx4060, name: RTX 4060 / Ti, match: ['rtx ?4060'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 240, new: 320}
+      - {key: rtx4070s, name: RTX 4070 Super / Ti, match: ['rtx ?4070 ?(?:super|ti)'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 520, new: 650}
+      - {key: rtx4070, name: RTX 4070, match: ['rtx ?4070'], exclude: ['super', '\bti\b', '\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 430, new: 600}
+      - {key: rtx4080, name: RTX 4080 / Super, match: ['rtx ?4080'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 780, new: 1050}
+      - {key: rtx4090, name: RTX 4090, match: ['rtx ?4090'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 1500, new: 1900}
+      - {key: rx6800, name: RX 6800 / XT, match: ['rx ?6800'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 330}
+      - {key: rx7800, name: RX 7800 XT, match: ['rx ?7800'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 400, new: 520}
+      - {key: r5800x3d, name: Ryzen 7 5800X3D, match: ['5800 ?x3d'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 230}
+      - {key: r7800x3d, name: Ryzen 7 7800X3D, match: ['7800 ?x3d'], exclude: ['\bpc\b', 'computer', 'desktop', 'workstation', 'ordinateur', 'unite centrale', 'tour gamer', 'config', 'setup', 'portable', 'laptop', 'portatil', 'portatile', 'notebook', 'alienware', 'omen', 'raider', 'titan', 'legion', 'zephyrus', 'predator', 'nitro', 'tuf gaming f', 'ddr[45]', '\d+ ?(?:go|gb) (?:de )?ram', '\bram\b'], resale: 330, new: 420}
       - {key: x1carbon, name: ThinkPad X1 Carbon, match: ['x1 carbon'], resale: 380, generic: true}
       - {key: xps13, name: Dell XPS 13/15, match: ['\bxps ?1[35]\b'], resale: 420, generic: true}
 
   smartphones:
+    vinted_verification: electronics
+    verification_min_price: 50
+    required_specs: [storage]
     name: "Smartphones Android"
     emoji: "📱"
     description: "Galaxy S/Z, Pixel : liquides, revente en quelques jours, mais vérif IMEI/verrouillage indispensable."

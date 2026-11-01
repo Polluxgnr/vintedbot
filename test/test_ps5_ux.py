@@ -77,3 +77,27 @@ def test_ai_scam_signal_marks_seller_and_card():
     card = deal_caption(deal)
     assert card.startswith("🚨 <b>ARNAQUE PROBABLE</b>")
     assert "Incomplet</b> : manette" in card and "Photo" not in card.split("Incomplet")[1].split("\n")[0]
+
+
+def test_specs_extraction_and_missing_specs():
+    from vinted_hunter.inspection import extract_specs, inspect_listing
+    assert extract_specs("Lenovo M720q i5-8500T 16Go RAM 256Go SSD") == {"storage": "256 Go", "ram": "16 Go", "cpu": "I5 8500T"}
+    assert extract_specs("iPhone 13 128 Go batterie 89%") == {"storage": "128 Go", "battery": "89 %"}
+    phone = inspect_listing(make("iPhone 13", 300, description="Très bon état"), CATALOG.get("apple_tech"))
+    assert phone.missing_specs == ["storage", "battery"] and phone.verification == "electronics"
+    full = inspect_listing(make("iPhone 13 128 Go", 300, description="batterie 91 %"), CATALOG.get("apple_tech"))
+    assert full.missing_specs == []
+    cheap = inspect_listing(make("Manette", 20), CONSOLES)
+    assert cheap.verification is None                       # under the verification minimum price
+
+
+def test_missing_specs_block_pepite_and_verification_scores():
+    from vinted_hunter.config import RuntimeSettings
+    from vinted_hunter.market import estimate
+    from vinted_hunter.models import Condition
+    from vinted_hunter.scoring import build_deal, gate_fails
+    apple, rs = CATALOG.get("apple_tech"), RuntimeSettings()
+    l = make("iPhone 13", 150, model_key="apple_tech:iphone13", details_loaded=True, description="Comme neuf")
+    deal = build_deal(l, estimate(Condition.VERY_GOOD, reference=280), apple, rs)
+    assert any(f.startswith("specs à vérifier") for f in gate_fails(deal, apple, rs, require_market=False))
+    assert deal.score_parts["vérification Vinted dispo"] == 5

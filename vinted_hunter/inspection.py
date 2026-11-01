@@ -68,6 +68,35 @@ _POSITIVES = [(re.compile(p), label) for p, label in POSITIVES]
 _SCAMS = [(re.compile(p), label) for p, label in SCAMS]
 
 
+SPEC_PATTERNS = {
+    "storage": r"\b(\d{2,4}) ?(?:go|gb|gigas?)\b(?! ?(?:de )?ram)|\b([124]) ?(?:to|tb)\b",
+    "ram": r"\b(\d{1,3}) ?(?:go|gb) (?:de )?ram\b|\bram (\d{1,3}) ?(?:go|gb)\b",
+    "cpu": r"\b(i[3579][ -]?\d{4,5}[a-z]{0,2}|ryzen [3579] \d{4}[a-z]{0,2}|m[1-4](?: pro| max| ultra)?|n100|n95|celeron \w+)\b",
+    "battery": r"batterie (?:a |à )?(\d{2,3}) ?%|(\d{2,3}) ?% (?:de )?(?:batterie|capacite)",
+}
+SPEC_LABELS = {"storage": "stockage", "ram": "RAM", "cpu": "processeur", "battery": "santé batterie"}
+
+
+def extract_specs(text: str) -> dict[str, str]:
+    norm = normalize(text).replace("%", " %")
+    raw = (text or "").lower()
+    out: dict[str, str] = {}
+    for key, pattern in SPEC_PATTERNS.items():
+        m = re.search(pattern, raw if key == "battery" else norm)
+        if not m:
+            continue
+        val = next(g for g in m.groups() if g)
+        if key == "storage":
+            out[key] = f"{val} To" if m.group(2) else f"{val} Go"
+        elif key == "ram":
+            out[key] = f"{val} Go"
+        elif key == "battery":
+            out[key] = f"{val} %"
+        else:
+            out[key] = val.upper()
+    return out
+
+
 def clauses(text: str) -> list[str]:
     return [c for c in (normalize(part) for part in _CLAUSE_SPLIT.split((text or "").lower())) if c]
 
@@ -121,7 +150,18 @@ def inspect_listing(listing: Listing, niche: Niche | None) -> Inspection:
     findings += list(worst.values())
     findings += [Finding(kind="positive", label=p) for p in sorted(seen_pos)]
     findings += [Finding(kind="scam", label=s) for s in sorted(scams)]
-    return Inspection(findings=findings)
+    specs = extract_specs(text)
+    needed = list(niche.required_specs) if niche else []
+    if niche and niche.id in ("apple_tech", "smartphones"):
+        needed = ["storage"] if re.search(r"iphone|ipad|galaxy|pixel|xiaomi|oneplus|nothing|macbook",
+                                          normalize(listing.title)) else []
+        if re.search(r"iphone|galaxy|pixel", normalize(listing.title)):
+            needed.append("battery")
+    verification = None
+    if niche and niche.vinted_verification and listing.price >= niche.verification_min_price:
+        verification = niche.vinted_verification
+    return Inspection(findings=findings, specs=specs, missing_specs=[k for k in needed if k not in specs],
+                      verification=verification)
 
 
 def apply_inspection(valuation: Valuation, insp: Inspection) -> Valuation:

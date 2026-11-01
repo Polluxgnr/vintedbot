@@ -115,6 +115,9 @@ class Niche(BaseModel):
     model_guard: list[str] = Field(default_factory=list)  # title says it's another product type -> no model
     alone: list[AloneRule] = Field(default_factory=list)
     collectible: bool = False         # can resell above retail (sneakers, retro, TCG...) -> no retail cap
+    vinted_verification: str | None = None   # "electronics" | "authenticity": Vinted's optional paid check
+    verification_min_price: float = 0
+    required_specs: list[str] = Field(default_factory=list)   # specs that change the price (storage, cpu...)
     enabled_by_default: bool = False
 
     @cached_property

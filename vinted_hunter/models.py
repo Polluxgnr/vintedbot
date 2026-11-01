@@ -134,6 +134,9 @@ class Finding(BaseModel):
 
 class Inspection(BaseModel):
     findings: list[Finding] = Field(default_factory=list)
+    specs: dict[str, str] = Field(default_factory=dict)       # storage, ram, cpu, battery... read from the listing
+    missing_specs: list[str] = Field(default_factory=list)    # price-relevant specs the seller didn't give
+    verification: str | None = None                           # Vinted verification likely offered for this item
 
     @property
     def missing(self) -> list[Finding]:
@@ -221,6 +224,8 @@ class AIVerdict(BaseModel):
     adjust_pct: float | None = None    # AI's value adjustment for missing parts / defects (negative)
     new_price: float | None = None
     seller_ok: bool | None = None
+    specs: dict[str, str] = Field(default_factory=dict)       # specs confirmed by the AI (text + photos)
+    specs_consistent: bool | None = None                      # False = title/description/photos disagree
     cost_usd: float = 0.0
 
 

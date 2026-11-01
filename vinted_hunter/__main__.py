@@ -17,6 +17,7 @@ import sys
 from .config import RuntimeSettings, get_settings
 from .models import SearchSpec
 from .runtime import acquire_single_instance, build_services, setup_logging
+from .vinted.client import VintedUnavailable
 
 
 def _print_deals(deals, limit: int = 15) -> None:
@@ -59,6 +60,36 @@ async def _cli(args: argparse.Namespace) -> None:
                 print(deal.verdict.model_dump_json(indent=2) if deal.verdict else "")
             else:
                 print("Annonce introuvable")
+        elif args.cmd == "harvest":
+            # Big data run: crawl every niche and model for N minutes, then clean and recalibrate.
+            import time
+
+            end = time.monotonic() + args.minutes * 60
+            new = steps = 0
+            while time.monotonic() < end:
+                try:
+                    new += await sv.hunter.harvest_step()
+                except VintedUnavailable as exc:
+                    print(" ", exc)
+                    await asyncio.sleep(sv.vinted.cooldown_remaining + 1)
+                    continue
+                steps += 1
+                if steps % 25 == 0:
+                    left = (end - time.monotonic()) / 60
+                    print(f"  {steps} pages · {new} nouvelles annonces · {left:.0f} min restantes", flush=True)
+            print(f"Récolte terminée : {steps} pages, {new} nouvelles annonces.")
+            print("Calibration :", await sv.db.calibrate(), "modèles")
+        elif args.cmd == "study":
+            import json
+
+            from .study import format_study, niche_study
+
+            study = await niche_study(sv.db, sv.niches, days=args.days)
+            if args.json:
+                with open(args.json, "w", encoding="utf-8") as fh:
+                    json.dump(study, fh, ensure_ascii=False, indent=1)
+                print("écrit :", args.json)
+            print(format_study(study, top=12))
         elif args.cmd == "niches":
             for n in sv.niches:
                 print(f"{n.id:22} {n.label:32} {len(n.queries):>2} requêtes  {len(n.models):>2} modèles  risque={n.authenticity_risk}")
@@ -81,6 +112,10 @@ def main() -> None:
     sub.add_parser("price").add_argument("query")
     sub.add_parser("analyze").add_argument("url")
     sub.add_parser("niches")
+    sub.add_parser("harvest").add_argument("--minutes", type=float, default=60)
+    st = sub.add_parser("study")
+    st.add_argument("--days", type=int, default=7)
+    st.add_argument("--json")
     args = parser.parse_args()
 
     settings = get_settings()
