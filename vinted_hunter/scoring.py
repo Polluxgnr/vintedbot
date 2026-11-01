@@ -208,6 +208,18 @@ def gate_fails(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: Searc
     return fails
 
 
+def radar_worthy(deal: Deal) -> bool:
+    """Good enough for the Top/radar list: real money, identified model, nothing alarming."""
+    key = deal.listing.model_key or "sig:"
+    return (
+        deal.valuation.fair_value is not None and (deal.profit or 0) >= 10 and deal.score >= 45
+        and "prix_suspect" not in deal.flags and not key.startswith("sig:")
+        and not (deal.seller_check and deal.seller_check.level == "risque")
+        and not (deal.inspection and deal.inspection.scams)
+        and not (deal.verdict and (not deal.verdict.relevant or deal.verdict.recommendation is Recommendation.SKIP))
+    )
+
+
 def is_alert_worthy(deal: Deal, rs: RuntimeSettings, niche: Niche | None, spec: SearchSpec | None = None) -> bool:
     if rs.alert_mode == "pepites":
         return not gate_fails(deal, niche, rs, spec)

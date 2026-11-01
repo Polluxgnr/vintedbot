@@ -24,7 +24,7 @@ from .db import Database
 from .market import estimate, robust_center
 from .models import AIVerdict, Condition, Deal, Listing, MarketCheck, SearchSpec
 from .niches import STOPWORDS, Niche, NicheCatalog, normalize, signature_key
-from .scoring import build_deal, gate_fails, is_alert_worthy, reference_of, reject_reason
+from .scoring import build_deal, gate_fails, is_alert_worthy, radar_worthy, reference_of, reject_reason
 from .vinted.client import VintedClient, VintedUnavailable
 
 log = logging.getLogger(__name__)
@@ -50,6 +50,8 @@ class Hunter:
         self._seeded: set[tuple[int, str]] = set()
         self._near_miss: dict[int, tuple[int, int]] = {}   # listing -> (chat, watch) to re-alert on price drops
         self._last_tracker = 0.0
+        self._yield: dict[int, float] = {}                 # watch -> recent good-deal yield (EWMA)
+        self._last_cleanup = 0.0
         self.ai_notice: str | None = None   # last budget / API problem, surfaced in /stats
 
     # ============================================================ cascade
@@ -289,6 +291,7 @@ class Hunter:
         checked = {d.listing.id: await self.verify_market(d, niche, rs, spec) for d in shortlist}
         deals = [checked.get(d.listing.id, self._gate(d, niche, rs, spec)) for d in deals]
         deals.sort(key=lambda d: (d.pepite, d.score), reverse=True)
+        await self.db.save_radar([d for d in deals if radar_worthy(d)])
         return deals, niche
 
     async def analyze_url(self, url: str, rs: RuntimeSettings, progress: Progress = _noop) -> Deal | None:
@@ -377,6 +380,7 @@ class Hunter:
 
         pool = self.query_pool(listings, sub.query, niche, spec)
         deals = await self.evaluate(fresh, niche=niche, spec=spec, rs=rs, mode="watch", pool=pool)
+        await self.db.save_radar([d for d in deals if radar_worthy(d)])
         hits = verified = 0
         for d in deals:
             if d.listing.id in known:
@@ -392,10 +396,14 @@ class Hunter:
                     continue
                 verified += 1
                 d = await self.verify_market(d, niche, rs, spec)
+                if radar_worthy(d):
+                    await self.db.save_radar([d])
                 if not d.pepite:
                     log.info("near miss %s (%s): %s", d.listing.id, d.listing.title[:40], "; ".join(d.gate_fails))
                     await self.db.track([d.listing], priority=1)
                     self._near_miss[d.listing.id] = (chat_id, watch["id"])
+                    while len(self._near_miss) > 5000:            # bounded memory
+                        self._near_miss.pop(next(iter(self._near_miss)))
                     continue
             elif not is_alert_worthy(d, rs, niche, spec):
                 continue
@@ -405,6 +413,16 @@ class Hunter:
             hits += 1
         await self.db.touch_watch(watch["id"], hits)
         return hits
+
+    def _interval(self, watch_id: int) -> float:
+        """Adaptive polling: a niche that keeps producing good deals is polled up to 2x more often,
+        one that produced nothing for a while up to 2x less (the Vinted request budget goes where the money is)."""
+        y = self._yield.get(watch_id, 1.0)
+        return self.s.watch_interval_s * (0.5 if y >= 2 else 0.75 if y >= 0.8 else 1.0 if y >= 0.2 else 2.0)
+
+    async def _radar_count(self) -> int:
+        row = await self.db._one("SELECT COUNT(*) AS n FROM radar")
+        return row["n"] if row else 0
 
     async def run_tracker(self, notify: Notify, batch: int = 6) -> int:
         """Re-check a few tracked listings: record sales, and re-evaluate near misses whose price dropped."""
@@ -439,6 +457,12 @@ class Hunter:
     async def run_forever(self, notify: Notify) -> None:
         log.info("Watch loop started")
         while True:
+            if time.monotonic() - self._last_cleanup > 86400:    # daily retention
+                self._last_cleanup = time.monotonic()
+                try:
+                    log.info("database cleanup: %s", await self.db.cleanup())
+                except Exception:
+                    log.exception("cleanup failed")
             if time.monotonic() - self._last_tracker > 600:     # sales database: 6 checks / 10 min
                 self._last_tracker = time.monotonic()
                 try:
@@ -448,11 +472,14 @@ class Hunter:
                     log.exception("sales tracker failed")
             try:
                 for w in await self.db.watches(active_only=True):
-                    if time.monotonic() - self._last_run.get(w["id"], 0) < self.s.watch_interval_s:
+                    if time.monotonic() - self._last_run.get(w["id"], 0) < self._interval(w["id"]):
                         continue
                     self._last_run[w["id"]] = time.monotonic()
                     try:
+                        before = await self._radar_count()
                         hits = await self.run_watch(w, notify)
+                        found = await self._radar_count() - before + 3 * hits
+                        self._yield[w["id"]] = 0.7 * self._yield.get(w["id"], 1.0) + 0.3 * found
                         if hits:
                             log.info("watch %s (%s): %s alert(s)", w["id"], w["name"], hits)
                     except VintedUnavailable as exc:

@@ -50,7 +50,7 @@ def main_menu() -> Kb:
     return Kb([
         [Btn("🔎 Nouvelle chasse", callback_data="m:hunt"), Btn("🔗 Analyser une annonce", callback_data="m:analyze")],
         [Btn("🎯 Niches", callback_data="m:niches"), Btn("👁 Mes alertes", callback_data="m:watches")],
-        [Btn("💶 Prix du marché", callback_data="m:price"), Btn("🏆 Top 24 h", callback_data="m:top")],
+        [Btn("💶 Prix du marché", callback_data="m:price"), Btn("🏆 Radar / Top", callback_data="m:top")],
         [Btn("💼 Portefeuille", callback_data="m:pf"), Btn("📊 Stats", callback_data="m:stats")],
         [Btn("⚙️ Réglages", callback_data="m:settings"), Btn("ℹ️ Comment ça marche", callback_data="m:help")],
     ])
@@ -251,6 +251,57 @@ def deal_keyboard(d: Deal) -> Kb:
          Btn("💬 Message vendeur", callback_data=f"d:neg:{lid}")],
         [Btn("✅ Acheté", callback_data=f"d:buy:{lid}"), Btn("🙈 Ignorer", callback_data=f"d:ign:{lid}")],
     ])
+
+
+RADAR_SORT_LABELS = {"score": "⭐ Score", "profit": "💰 Profit", "marge": "📈 Marge", "remise": "🏷 Remise",
+                     "recent": "🆕 Récent"}
+RADAR_PERIODS = {24: "24 h", 72: "3 j", 168: "7 j"}
+
+
+def radar_view(deals: list[Deal], total: int, *, sort: str, niche: str | None, page: int, hours: int,
+               niches: list[tuple[str, int]], labels: dict[str, str], per_page: int = 10) -> tuple[str, Kb]:
+    """Sortable list of every good deal seen (pépites first when sorted by score)."""
+    scope = labels.get(niche, "toutes les niches") if niche else "toutes les niches"
+    head = (f"🏆 <b>Radar — {RADAR_PERIODS.get(hours, f'{hours} h')}</b> · {e(scope)} · "
+            f"tri {RADAR_SORT_LABELS.get(sort, sort)}\n{total} bonnes affaires")
+    lines = [head, ""]
+    if not deals:
+        lines.append("Rien pour l'instant. Le radar se remplit au fil des scans (laisse tourner le bot).")
+    for i, d in enumerate(deals, start=page * per_page + 1):
+        l, v = d.listing, d.valuation
+        tag = "🔥" if d.pepite else "•"
+        name = d.verdict.model_name if d.verdict and d.verdict.model_name else (l.model_name or l.title)
+        disc = f" −{(1 - l.price / v.fair_value) * 100:.0f}%" if v.fair_value else ""
+        seller = d.seller_check.icon if d.seller_check else ""
+        speed = f" ⚡{v.days_to_sell:.0f}j" if v.days_to_sell is not None and v.sold_count >= 3 else ""
+        age = _age(l.age_minutes)
+        lines.append(f"{i}. {tag} <a href=\"{e(l.url)}\">{e(name[:42])}</a>")
+        lines.append(f"    {l.price:.0f} € → cote {v.fair_value or 0:.0f} €{disc} · <b>{d.profit or 0:+.0f} €</b> "
+                     f"({d.margin_pct or 0:+.0f}%) · ⭐{d.score} {seller}{speed}{' · ' + age if age else ''}")
+    pages = max(1, -(-total // per_page))
+    n = niche or "all"
+    rows = [[Btn(("• " if k == sort else "") + lab, callback_data=f"tp:{k}:{n}:0:{hours}")
+             for k, lab in list(RADAR_SORT_LABELS.items())[:3]],
+            [Btn(("• " if k == sort else "") + lab, callback_data=f"tp:{k}:{n}:0:{hours}")
+             for k, lab in list(RADAR_SORT_LABELS.items())[3:]]
+            + [Btn(("• " if h == hours else "") + lab, callback_data=f"tp:{sort}:{n}:0:{h}")
+               for h, lab in RADAR_PERIODS.items()]]
+    niche_btns = [Btn(("• " if niche is None else "") + "Toutes", callback_data=f"tp:{sort}:all:0:{hours}")]
+    niche_btns += [Btn(("• " if nid == niche else "") + f"{labels.get(nid, nid)[:14]} ({cnt})",
+                       callback_data=f"tp:{sort}:{nid}:0:{hours}") for nid, cnt in niches[:8]]
+    rows += [niche_btns[i:i + 3] for i in range(0, len(niche_btns), 3)]
+    if deals:
+        open_btns = [Btn(f"📄 {i}", callback_data=f"rv:{d.listing.id}")
+                     for i, d in enumerate(deals, start=page * per_page + 1)]
+        rows += [open_btns[i:i + 5] for i in range(0, len(open_btns), 5)]
+    nav = []
+    if page > 0:
+        nav.append(Btn("◀️", callback_data=f"tp:{sort}:{n}:{page - 1}:{hours}"))
+    nav.append(Btn(f"{page + 1}/{pages}", callback_data="noop"))
+    if page + 1 < pages:
+        nav.append(Btn("▶️", callback_data=f"tp:{sort}:{n}:{page + 1}:{hours}"))
+    rows.append(nav)
+    return "\n".join(lines)[:4000], Kb(rows)
 
 
 def market_line(d: Deal) -> str:

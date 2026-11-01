@@ -135,6 +135,7 @@ class HunterBot:
         app.add_handler(CallbackQueryHandler(self.on_setting, pattern=r"^s:"))
         app.add_handler(CallbackQueryHandler(self.on_more, pattern=r"^more$"))
         app.add_handler(CallbackQueryHandler(self.on_help, pattern=r"^h:"))
+        app.add_handler(CallbackQueryHandler(self.on_radar, pattern=r"^(?:tp|rv):"))
         app.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.answer(), pattern=r"^noop$"))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.on_text))
         app.add_error_handler(self._on_error)
@@ -147,7 +148,7 @@ class HunterBot:
         await app.bot.set_my_commands([
             BotCommand("hunt", "Nouvelle chasse guidée"), BotCommand("analyze", "Analyser un lien Vinted"),
             BotCommand("price", "Prix du marché d'un produit"), BotCommand("niches", "Niches surveillées"),
-            BotCommand("watches", "Mes alertes"), BotCommand("top", "Meilleures affaires 24 h"),
+            BotCommand("watches", "Mes alertes"), BotCommand("top", "Radar : toutes les bonnes affaires, triables"),
             BotCommand("portfolio", "Achats / ventes / profit"), BotCommand("stats", "Statistiques & coût IA"),
             BotCommand("settings", "Réglages"), BotCommand("aide", "Comment sont calculés cote, confiance, score"),
             BotCommand("menu", "Menu principal"),
@@ -667,15 +668,31 @@ class HunterBot:
             except TelegramError:
                 log.warning("digest not delivered to %s", chat_id)
 
+    async def _radar_screen(self, sort: str = "score", niche: str | None = None, page: int = 0,
+                            hours: int = 24) -> tuple[str, v.Kb]:
+        deals, total = await self.db.radar(hours=hours, sort=sort, niche=niche, limit=10, offset=page * 10)
+        labels = {n.id: n.label for n in self.sv.niches}
+        return v.radar_view(deals, total, sort=sort, niche=niche, page=page, hours=hours,
+                            niches=await self.db.radar_niches(hours), labels=labels)
+
     async def show_top(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        chat_id = update.effective_chat.id
-        deals = await self.db.top_deals(chat_id)
-        if not deals:
-            await self._reply(update, "🏆 Pas encore d'affaire ces dernières 24 h.")
+        text, kb = await self._radar_screen()
+        await self._reply(update, text, reply_markup=kb, link_preview_options=LinkPreviewOptions(is_disabled=True))
+
+    async def on_radar(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        q = update.callback_query
+        await self._answer(update)
+        if q.data.startswith("rv:"):
+            deal = await self.db.get_deal(int(q.data.split(":")[1]))
+            if deal:
+                await self.send_deal(update.effective_chat.id, deal)
             return
-        await self._reply(update, f"🏆 <b>Top {len(deals)} des 24 dernières heures</b>")
-        for d in deals[:RESULTS_PER_PAGE]:
-            await self.send_deal(chat_id, d)
+        _, sort, niche, page, hours = q.data.split(":")
+        text, kb = await self._radar_screen(sort, None if niche == "all" else niche, int(page), int(hours))
+        try:
+            await q.message.edit_text(text, reply_markup=kb, link_preview_options=LinkPreviewOptions(is_disabled=True))
+        except BadRequest:
+            pass
 
     async def show_portfolio(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         rows = await self.db.portfolio(update.effective_chat.id)

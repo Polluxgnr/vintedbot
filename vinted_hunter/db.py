@@ -66,6 +66,13 @@ CREATE TABLE IF NOT EXISTS tracking (
 );
 CREATE INDEX IF NOT EXISTS ix_tracking_due ON tracking(status, last_checked);
 CREATE INDEX IF NOT EXISTS ix_tracking_model ON tracking(model_key, status);
+
+-- Radar: every good deal seen (not only the alerted pépites), for the sortable "Top" view.
+CREATE TABLE IF NOT EXISTS radar (
+    listing_id INTEGER PRIMARY KEY, niche_id TEXT, score INTEGER, profit REAL, margin REAL, discount REAL,
+    price REAL, pepite INTEGER DEFAULT 0, data TEXT, seen_at TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_radar_seen ON radar(seen_at);
 """
 
 
@@ -135,9 +142,11 @@ class Database:
                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(id) DO UPDATE SET price=excluded.price, last_seen=excluded.last_seen,
                        model_key=COALESCE(excluded.model_key, listings.model_key),
-                       niche_id=COALESCE(excluded.niche_id, listings.niche_id), data=excluded.data""",
+                       niche_id=COALESCE(excluded.niche_id, listings.niche_id),
+                       data=COALESCE(excluded.data, listings.data)""",
                 (l.id, l.niche_id, l.model_key, l.title, l.price, l.brand, int(l.condition), l.url,
-                 l.photos[0] if l.photos else None, l.seller.id, l.model_dump_json(), now, now),
+                 l.photos[0] if l.photos else None, l.seller.id,
+                 None if (l.model_key or "sig:").startswith("sig:") else l.model_dump_json(), now, now),
             )
         await self.conn.commit()
 
@@ -213,7 +222,7 @@ class Database:
 
     async def get_listing(self, listing_id: int) -> Listing | None:
         row = await self._one("SELECT data FROM listings WHERE id=?", (listing_id,))
-        return Listing.model_validate_json(row["data"]) if row else None
+        return Listing.model_validate_json(row["data"]) if row and row["data"] else None
 
     async def comparables(self, model_key: str, *, days: int = 45, exclude_id: int | None = None,
                           limit: int = 400) -> list[tuple[float, Condition]]:
@@ -262,8 +271,63 @@ class Database:
         await self.conn.commit()
 
     async def get_deal(self, listing_id: int) -> Deal | None:
-        row = await self._one("SELECT data FROM deals WHERE listing_id=?", (listing_id,))
+        row = await self._one("SELECT data FROM deals WHERE listing_id=?", (listing_id,)) \
+            or await self._one("SELECT data FROM radar WHERE listing_id=?", (listing_id,))
         return Deal.model_validate_json(row["data"]) if row else None
+
+    # ---------------------------------------------------------------- radar
+    async def save_radar(self, deals: list[Deal]) -> None:
+        now = _now()
+        for d in deals:
+            fv = d.valuation.fair_value or 0
+            discount = round((1 - d.listing.price / fv) * 100, 1) if fv else None
+            await self.conn.execute(
+                """INSERT INTO radar(listing_id, niche_id, score, profit, margin, discount, price, pepite, data, seen_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(listing_id) DO UPDATE SET score=excluded.score, profit=excluded.profit,
+                       margin=excluded.margin, discount=excluded.discount, price=excluded.price,
+                       pepite=MAX(radar.pepite, excluded.pepite), data=excluded.data""",
+                (d.listing.id, d.listing.niche_id, d.score, d.profit, d.margin_pct, discount, d.listing.price,
+                 int(d.pepite), d.model_dump_json(), now),
+            )
+        await self.conn.commit()
+
+    RADAR_SORTS = {"score": "pepite DESC, score DESC", "profit": "profit DESC", "marge": "margin DESC",
+                   "remise": "discount DESC", "recent": "seen_at DESC"}
+
+    async def radar(self, *, hours: int = 24, sort: str = "score", niche: str | None = None,
+                    limit: int = 10, offset: int = 0) -> tuple[list[Deal], int]:
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        where, args = "seen_at>=?", [since]
+        if niche:
+            where += " AND niche_id=?"
+            args.append(niche)
+        total = (await self._one(f"SELECT COUNT(*) AS n FROM radar WHERE {where}", tuple(args)))["n"]
+        rows = await self._all(
+            f"SELECT data FROM radar WHERE {where} ORDER BY {self.RADAR_SORTS.get(sort, 'score DESC')} LIMIT ? OFFSET ?",
+            (*args, limit, offset))
+        return [Deal.model_validate_json(r["data"]) for r in rows], total
+
+    async def radar_niches(self, hours: int = 24) -> list[tuple[str, int]]:
+        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
+        rows = await self._all("SELECT niche_id, COUNT(*) AS n FROM radar WHERE seen_at>=? AND niche_id IS NOT NULL "
+                               "GROUP BY niche_id ORDER BY n DESC", (since,))
+        return [(r["niche_id"], r["n"]) for r in rows]
+
+    async def cleanup(self) -> dict[str, int]:
+        """Retention: keep the database fast. Sales history (tracking) is kept; raw noise is not."""
+        cut = lambda days: (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()  # noqa: E731
+        out = {}
+        for table, col, days in (("price_obs", "observed_at", 120), ("radar", "seen_at", 14),
+                                 ("verdicts", "updated_at", 30)):
+            cur = await self.conn.execute(f"DELETE FROM {table} WHERE {col} < ?", (cut(days),))
+            out[table] = cur.rowcount
+        cur = await self.conn.execute(
+            "DELETE FROM listings WHERE last_seen < ? AND id NOT IN (SELECT listing_id FROM tracking) "
+            "AND id NOT IN (SELECT listing_id FROM deals)", (cut(30),))
+        out["listings"] = cur.rowcount
+        await self.conn.commit()
+        return out
 
     async def set_deal_status(self, listing_id: int, status: str, *, buy_price: float | None = None,
                               sell_price: float | None = None) -> None:

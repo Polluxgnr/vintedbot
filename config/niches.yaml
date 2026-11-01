@@ -443,8 +443,9 @@ niches:
     emoji: "💎"
     description: "Maroquinerie & accessoires de luxe. Profits énormes mais risque de fake maximal - analyse IA systématique."
     queries: [sac louis vuitton, sac gucci, foulard hermes, carre hermes, ceinture hermes, sac longchamp le pliage, sac chanel,
-              lunettes ray-ban, sac prada, sac celine]
-    price_max: 2000
+              lunettes ray-ban, sac prada, sac celine, sac dior, goyard, louis vuitton keepall, louis vuitton alma, hermes evelyne,
+              prada re-edition, gucci marmont, bottega veneta]
+    price_max: 5000
     shipping_eur: 8
     min_profit: 60
     authenticity_risk: very_high
@@ -462,6 +463,15 @@ niches:
       - {key: hermes_carre, name: Carré Hermès 90, match: ['(?:carre|foulard).*hermes|hermes.*(?:carre|foulard)'], resale: 230, new: 520}
       - {key: hermes_belt, name: Ceinture Hermès H, match: ['ceinture.*hermes|hermes.*ceinture'], resale: 450, new: 950}
       - {key: longchamp_pliage, name: Longchamp Le Pliage, match: ['pliage'], resale: 60, new: 145}
+      - {key: lv_alma, name: Louis Vuitton Alma, match: ['\balma\b'], resale: 650, new: 1850}
+      - {key: lv_keepall, name: Louis Vuitton Keepall, match: ['keepall'], resale: 750, new: 2300}
+      - {key: dior_saddle, name: Dior Saddle, match: ['dior.*saddle|saddle.*dior'], resale: 1700, new: 4100}
+      - {key: goyard_stlouis, name: Goyard Saint-Louis/Artois, match: ['goyard'], resale: 900, generic: true}
+      - {key: hermes_evelyne, name: Hermès Evelyne, match: ['evelyne'], resale: 1300, new: 2900}
+      - {key: prada_reedition, name: Prada Re-Edition, match: ['re ?edition'], resale: 650, new: 1600}
+      - {key: gucci_marmont, name: Gucci GG Marmont, match: ['marmont'], resale: 700, new: 1900}
+      - {key: celine_triomphe, name: Celine Triomphe, match: ['celine.*triomphe|triomphe.*celine'], resale: 1300, new: 3400}
+      - {key: chanel_flap, name: Chanel Classic/Timeless Flap, match: ['chanel.*(?:timeless|classique|classic|flap|11 ?12|2 ?55)'], resale: 4500, new: 10400}
       - {key: rayban, name: Ray-Ban (Wayfarer/Aviator), match: ['ray ?ban'], resale: 60, new: 179, generic: true}
 
   football_shirts:
@@ -485,3 +495,115 @@ niches:
       - {key: shirt_90s_om, name: Maillot OM années 90, match: ['\bom\b.*(?:199\d|vintage|retro)|marseille.*(?:199\d|vintage)'], resale: 100}
       - {key: shirt_fr98, name: Maillot France 1998, match: ['france.*1998|98.*france'], resale: 120}
       - {key: shirt_vintage, name: Maillot vintage (générique), match: ['maillot.*(?:vintage|retro|199\d|200[0-6])'], resale: 55, generic: true}
+
+  mini_pc_homelab:
+    name: "Mini PC & homelab"
+    emoji: "🖥️"
+    description: "Mac mini, NUC, ThinkCentre Tiny, Raspberry Pi, Jetson, NAS - pour héberger IA et projets cloud chez soi. Les particuliers les bradent après un déménagement."
+    enabled_by_default: true
+    queries: [mac mini m1, mac mini m2, mac mini m4, intel nuc, lenovo thinkcentre tiny, hp elitedesk mini, dell optiplex micro,
+              minisforum, beelink mini pc, raspberry pi 5, raspberry pi 4, synology nas, nvidia jetson, mini pc]
+    price_min: 25
+    price_max: 1200
+    shipping_eur: 8
+    min_profit: 35
+    authenticity_risk: medium
+    collectible: false
+    model_guard:
+      - '^(?:boitier|case|coque|alimentation|chargeur|cable|support|ventilateur|dissipateur|carte sd|ecran)\b'
+      - '\b(?:boitier seul|sans carte mere|carte mere seule|pour pieces)\b'
+    components: [{name: alimentation, match: 'alimentation|chargeur|bloc secteur|adaptateur', share: 0.08}, {name: SSD/disque, match: 'ssd|disque|stockage|hdd', share: 0.2}, {name: RAM, match: 'ram|memoire', share: 0.15}, {name: boîte, match: 'boite', share: 0.03}]
+    alone: [{match: 'sans ssd ni ram|barebone|sans disque ni ram', missing: [SSD/disque, RAM]}]
+    exclude: ['\bboitier seul\b', '\bvide\b', '\bpour pieces\b', '\bcarte sd seule\b', '\bkit boitier\b']
+    red_flags: [mot de passe firmware / BIOS verrouillé, Mac lié à un compte iCloud (Activation Lock), « barebone » sans RAM ni SSD présenté comme complet, numéro de série effacé]
+    vision_checklist: [étiquette modèle/génération sous l'appareil, ports et état du boîtier, présence de l'alimentation d'origine, capture « À propos de ce Mac » ou BIOS (CPU/RAM/SSD)]
+    ai_hints: "La valeur dépend de la génération CPU, de la RAM et du SSD : un ThinkCentre i5-8500T 16 Go/256 Go vaut ~130 €, un i3-6100T ~60 €. Pour l'IA locale, les Mac mini M-series (mémoire unifiée) et les Jetson sont les plus recherchés. Vérifie toujours le verrouillage iCloud/BIOS."
+    models:
+      - {key: mac_mini_m4, name: Mac mini M4, match: ['mac ?mini.*\bm4\b'], resale: 520, new: 719}
+      - {key: mac_mini_m2, name: Mac mini M2 / M2 Pro, match: ['mac ?mini.*\bm2\b'], resale: 400}
+      - {key: mac_mini_m1, name: Mac mini M1, match: ['mac ?mini.*\bm1\b'], resale: 300}
+      - {key: mac_mini_intel, name: Mac mini Intel, match: ['mac ?mini'], exclude: ['\bm[1-4]\b'], resale: 110, generic: true}
+      - {key: rpi5, name: Raspberry Pi 5, match: ['raspberry pi ?5\b|\brpi ?5\b'], resale: 65, new: 90}
+      - {key: rpi4, name: Raspberry Pi 4, match: ['raspberry pi ?4\b|\brpi ?4\b'], resale: 40}
+      - {key: jetson, name: Nvidia Jetson (Orin/Nano), match: ['jetson'], resale: 280, new: 499, generic: true}
+      - {key: nuc, name: Intel NUC, match: ['\bnuc\b'], resale: 120, generic: true}
+      - {key: tiny_lenovo, name: Lenovo ThinkCentre Tiny, match: ['thinkcentre|\bm7[0-9]0q\b|\bm9[0-9]0q\b'], resale: 110, generic: true}
+      - {key: tiny_hp, name: HP EliteDesk/ProDesk Mini, match: ['(?:elitedesk|prodesk).*(?:mini|\bdm\b)'], resale: 110, generic: true}
+      - {key: tiny_dell, name: Dell OptiPlex Micro, match: ['optiplex.*micro'], resale: 100, generic: true}
+      - {key: minipc_chinese, name: Minisforum / Beelink, match: ['minisforum|beelink'], resale: 180, generic: true}
+      - {key: synology, name: NAS Synology (DS2xx+/DS9xx+), match: ['synology'], resale: 220, generic: true}
+
+  pc_hardware:
+    name: "Informatique & cartes graphiques"
+    emoji: "💻"
+    description: "GPU, CPU, PC portables pro : forte valeur, vendeurs pressés, beaucoup d'erreurs de prix."
+    enabled_by_default: true
+    queries: [rtx 3060, rtx 3070, rtx 3080, rtx 3090, rtx 4060, rtx 4070, rtx 4080, rtx 4090, carte graphique, rx 6800,
+              ryzen 7 5800x3d, ryzen 7 7800x3d, thinkpad x1 carbon, dell xps 13, pc portable gamer, pc gamer]
+    price_min: 40
+    price_max: 2500
+    shipping_eur: 9
+    min_profit: 40
+    authenticity_risk: medium
+    collectible: false
+    model_guard:
+      - '^(?:boite|backplate|ventirad|support|riser|cable|waterblock|coque|sacoche|housse)\b'
+      - '\b(?:boite (?:seule|vide)|boite uniquement|pour pieces|hs|defectueuse?)\b'
+    components: [{name: chargeur, match: 'chargeur|alimentation', share: 0.07}, {name: boîte, match: 'boite', share: 0.03}, {name: SSD, match: 'ssd|disque', share: 0.12}]
+    alone: []
+    exclude: ['\bboite (?:seule|vide)\b', '\bpour pieces\b', '\bdefectueuse?\b', '\bartefacts?\b', '\bbackplate\b', '\bventirad\b']
+    red_flags: [carte ayant servi au minage, artefacts / écran noir, carte « testée » sans capture de bench, prix très bas sur 4090 = arnaque fréquente, BIOS modifié]
+    vision_checklist: [connecteurs PCIe et alimentation (brûlures), ventilateurs et pâte thermique, étiquette numéro de série, capture GPU-Z / benchmark, état écran et clavier (portables)]
+    ai_hints: "Les GPU de minage ne sont pas forcément mauvais mais valent 10-15 % de moins. Une RTX 4090 à moins de 1000 € est presque toujours une arnaque. Pour les portables, la config (CPU, RAM, SSD, écran) fait la valeur."
+    models:
+      - {key: rtx3060ti, name: RTX 3060 Ti, match: ['3060 ?ti'], resale: 210}
+      - {key: rtx3060, name: RTX 3060, match: ['rtx ?3060'], exclude: ['\bti\b'], resale: 190}
+      - {key: rtx3070, name: RTX 3070 / Ti, match: ['rtx ?3070'], resale: 260}
+      - {key: rtx3080, name: RTX 3080 / Ti, match: ['rtx ?3080'], resale: 380}
+      - {key: rtx3090, name: RTX 3090 / Ti, match: ['rtx ?3090'], resale: 620}
+      - {key: rtx4060, name: RTX 4060 / Ti, match: ['rtx ?4060'], resale: 240, new: 320}
+      - {key: rtx4070s, name: RTX 4070 Super / Ti, match: ['rtx ?4070 ?(?:super|ti)'], resale: 520, new: 650}
+      - {key: rtx4070, name: RTX 4070, match: ['rtx ?4070'], exclude: ['super', '\bti\b'], resale: 430, new: 600}
+      - {key: rtx4080, name: RTX 4080 / Super, match: ['rtx ?4080'], resale: 780, new: 1050}
+      - {key: rtx4090, name: RTX 4090, match: ['rtx ?4090'], resale: 1500, new: 1900}
+      - {key: rx6800, name: RX 6800 / XT, match: ['rx ?6800'], resale: 330}
+      - {key: rx7800, name: RX 7800 XT, match: ['rx ?7800'], resale: 400, new: 520}
+      - {key: r5800x3d, name: Ryzen 7 5800X3D, match: ['5800 ?x3d'], resale: 230}
+      - {key: r7800x3d, name: Ryzen 7 7800X3D, match: ['7800 ?x3d'], resale: 330, new: 420}
+      - {key: x1carbon, name: ThinkPad X1 Carbon, match: ['x1 carbon'], resale: 380, generic: true}
+      - {key: xps13, name: Dell XPS 13/15, match: ['\bxps ?1[35]\b'], resale: 420, generic: true}
+
+  smartphones:
+    name: "Smartphones Android"
+    emoji: "📱"
+    description: "Galaxy S/Z, Pixel : liquides, revente en quelques jours, mais vérif IMEI/verrouillage indispensable."
+    enabled_by_default: true
+    queries: [samsung galaxy s24 ultra, samsung galaxy s24, samsung galaxy s23 ultra, samsung galaxy s23, galaxy z flip 5,
+              galaxy z fold 5, google pixel 8 pro, google pixel 8, google pixel 9, google pixel 7 pro]
+    price_min: 60
+    price_max: 1400
+    shipping_eur: 5
+    min_profit: 40
+    authenticity_risk: very_high
+    collectible: false
+    model_guard:
+      - '^(?:coque|etui|housse|protection|verre|film|cable|chargeur|support)\b'
+      - '\b(?:compatible|pour samsung|pour galaxy|pour pixel|for samsung|for galaxy|for pixel)\b'
+    components: [{name: chargeur, match: 'chargeur|cable', share: 0.03}, {name: boîte, match: 'boite', share: 0.03}, {name: S Pen, match: 's ?pen|stylet', share: 0.06}]
+    alone: []
+    exclude: ['\bfactice\b', '\bbloque\b', '\bblacklist\w*\b', '\bfrp\b', '\bpour pieces\b', '\bicloud\b']
+    red_flags: [compte Google / FRP non retiré, IMEI blacklisté, écran remplacé (non d'origine), burn-in sur AMOLED, prix < 50 % de la cote]
+    vision_checklist: [écran allumé (burn-in/rayures), dos et cadre, IMEI visible (capture *#06#), état batterie, numéro de modèle (SM-...)]
+    ai_hints: "Les Ultra se revendent le mieux. Un compte Google non retiré rend le téléphone inutilisable : exige une capture des paramètres réinitialisés."
+    models:
+      - {key: s24u, name: Galaxy S24 Ultra, match: ['s24 ?ultra'], resale: 750, new: 1469}
+      - {key: s24, name: Galaxy S24 / S24+, match: ['galaxy s24\b|\bs24\+?(?! ?ultra)\b'], exclude: ['ultra', '\bfe\b'], resale: 480, new: 899}
+      - {key: s23u, name: Galaxy S23 Ultra, match: ['s23 ?ultra'], resale: 560}
+      - {key: s23, name: Galaxy S23 / S23+, match: ['galaxy s23\b'], exclude: ['ultra', '\bfe\b'], resale: 370}
+      - {key: s22u, name: Galaxy S22 Ultra, match: ['s22 ?ultra'], resale: 380}
+      - {key: zflip5, name: Galaxy Z Flip 5/6, match: ['z ?flip ?[56]'], resale: 420}
+      - {key: zfold5, name: Galaxy Z Fold 5/6, match: ['z ?fold ?[56]'], resale: 820}
+      - {key: pixel9, name: Pixel 9 / 9 Pro, match: ['pixel ?9'], resale: 520, new: 899}
+      - {key: pixel8pro, name: Pixel 8 Pro, match: ['pixel ?8 ?pro'], resale: 450}
+      - {key: pixel8, name: Pixel 8, match: ['pixel ?8\b'], exclude: ['pro'], resale: 330}
+      - {key: pixel7pro, name: Pixel 7 Pro, match: ['pixel ?7 ?pro'], resale: 290}
