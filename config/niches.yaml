@@ -86,6 +86,11 @@ niches:
       - {key: retrox, name: Patagonia Retro-X, match: ['retro ?x'], resale: 110, new: 220}
       - {key: synchilla, name: Patagonia Synchilla, match: ['synchilla'], resale: 60, new: 130}
       - {key: better_sweater, name: Patagonia Better Sweater, match: ['better sweater'], resale: 55, new: 150}
+      - {key: moncler_maya, name: Moncler doudoune (Maya, Montclar...), match: ['moncler.*(?:doudoune|maya|montclar|jacket|veste)'], resale: 550}
+      - {key: canada_goose, name: Canada Goose parka, match: ['canada goose'], resale: 450}
+      - {key: tnf_himalayan, name: TNF Himalayan / 700 Retro, match: ['himalayan|north face.*700'], resale: 160}
+      - {key: arc_gamma, name: Arc'teryx Gamma, match: ['arc ?teryx.*gamma'], resale: 180}
+      - {key: salomon_veste, name: Salomon veste technique, match: ['salomon.*(?:veste|jacket|gore)'], resale: 80, generic: true}
 
   streetwear_designer:
     name: "Streetwear & designer"
@@ -118,6 +123,13 @@ niches:
       - {key: rl_bear, name: Ralph Lauren Polo Bear, match: ['polo bear', 'ralph lauren.*bear'], resale: 110, new: 330}
       - {key: rl_qzip, name: Ralph Lauren quarter zip, match: ['ralph lauren.*(quarter|1/4|demi) ?zip'], resale: 45, new: 170, generic: true}
       - {key: burberry_trench, name: Burberry trench, match: ['burberry.*trench'], resale: 380, new: 2200}
+      - {key: barbour_beaufort, name: Barbour Beaufort / Bedale, match: ['barbour.*(?:beaufort|bedale)'], resale: 140, new: 399}
+      - {key: levis_501_vintage, name: Levi's 501 vintage (made in USA), match: ['501.*(?:usa|vintage|big e)|levi.*(?:usa|big e)'], resale: 55}
+      - {key: nike_tech, name: Nike Tech Fleece, match: ['tech fleece'], resale: 55, new: 120}
+      - {key: supreme_bogo, name: Supreme Box Logo, match: ['supreme.*box ?logo|bogo'], resale: 180}
+      - {key: stussy_hoodie, name: Stüssy sweat/hoodie, match: ['stussy.*(?:hoodie|sweat|crewneck)'], resale: 70}
+      - {key: palace_triferg, name: Palace Tri-Ferg, match: ['palace.*(?:tri ?ferg|hoodie|sweat)'], resale: 90}
+      - {key: carhartt_og_active, name: Carhartt WIP OG Active / Arctic, match: ['carhartt.*(?:og active|arctic)'], resale: 110}
 
   apple_tech:
     name: "Apple & tech"
@@ -125,6 +137,7 @@ niches:
     description: "AirPods, iPad, MacBook, Apple Watch - les particuliers bradent, mais attention aux fakes et iCloud."
     enabled_by_default: true
     queries: [airpods pro 2, airpods max, airpods 4, ipad air, ipad pro, macbook air m1, macbook air m2, macbook pro m1,
+              iphone 11, iphone 12, iphone 13 mini, iphone 14 pro max, iphone 15 pro max, iphone 16, iphone 16 pro,
               apple watch series, iphone 13, iphone 14, iphone 15]
     price_min: 25
     price_max: 900
@@ -152,12 +165,21 @@ niches:
       - {key: mba_m1, name: MacBook Air M1, match: ['macbook air.*\bm1\b'], resale: 450}
       - {key: mba_m2, name: MacBook Air M2/M3, match: ['macbook air.*\bm[23]\b'], resale: 650, new: 1199}
       - {key: mbp_m1, name: MacBook Pro M1/M2 Pro/Max, match: ['macbook pro.*\bm[1-3]\b'], resale: 800}
+      - {key: iphone11, name: iPhone 11, match: ['iphone 11\b'], exclude: ['pro'], resale: 170}
+      - {key: iphone11pro, name: iPhone 11 Pro / Pro Max, match: ['iphone 11 pro'], resale: 210}
+      - {key: iphone12, name: iPhone 12, match: ['iphone 12\b'], exclude: ['pro', 'mini'], resale: 220}
+      - {key: iphone12pro, name: iPhone 12 Pro / Pro Max, match: ['iphone 12 pro'], resale: 300}
+      - {key: iphone13mini, name: iPhone 13 mini, match: ['iphone 13 mini'], resale: 260}
       - {key: iphone13, name: iPhone 13, match: ['iphone 13\b'], exclude: ['pro', 'mini'], resale: 280}
       - {key: iphone13pro, name: iPhone 13 Pro, match: ['iphone 13 pro'], resale: 380}
       - {key: iphone14, name: iPhone 14, match: ['iphone 14\b'], exclude: ['pro', 'plus'], resale: 360}
-      - {key: iphone14pro, name: iPhone 14 Pro, match: ['iphone 14 pro'], resale: 500}
+      - {key: iphone14pro, name: iPhone 14 Pro, match: ['iphone 14 pro'], exclude: ['max'], resale: 500}
       - {key: iphone15, name: iPhone 15, match: ['iphone 15\b'], exclude: ['pro', 'plus'], resale: 470, new: 769}
-      - {key: iphone15pro, name: iPhone 15 Pro, match: ['iphone 15 pro'], resale: 640}
+      - {key: iphone15pro, name: iPhone 15 Pro, match: ['iphone 15 pro'], exclude: ['max'], resale: 640}
+      - {key: iphone15promax, name: iPhone 15 Pro Max, match: ['iphone 15 pro max'], resale: 760}
+      - {key: iphone14promax, name: iPhone 14 Pro Max, match: ['iphone 14 pro max'], resale: 580}
+      - {key: iphone16, name: iPhone 16 / 16 Plus, match: ['iphone 16\b'], exclude: ['pro'], resale: 620, new: 969}
+      - {key: iphone16pro, name: iPhone 16 Pro / Pro Max, match: ['iphone 16 pro'], resale: 850, new: 1229}
       - {key: watch_s8, name: Apple Watch Series 8-10 / Ultra, match: ['apple watch.*(series (?:8|9|10)|ultra)'], resale: 230, new: 449, generic: true}
 
   consoles:
@@ -174,7 +196,7 @@ niches:
     authenticity_risk: medium
     collectible: false
     model_guard:
-      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:manettes?|controllers?|dualsense|dual sense|joy ?cons?|joystick|volant|amiibo|jeux?|games?|juego|spiel|gioco|steelbook|cartouche|cartridge|collection|anniversary|aniversario|remaster\w*|portal|casque|headset|camera|remote|telecommande|lecteur seul|disc drive|disk drive|accessoires?)\b'
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:manettes?|controllers?|dualsense|dual sense|joy ?cons?|joystick|mando|mandos|comando|comandos|controle|kontroller|gamepad|volant|amiibo|jeux?|games?|juego|spiel|gioco|steelbook|cartouche|cartridge|collection|anniversary|aniversario|remaster\w*|portal|casque|headset|camera|remote|telecommande|lecteur seul|disc drive|disk drive|accessoires?)\b'
       - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:housse|etui|sacoche|coque|carcasa|cover|faceplates?|facade|plaques?|cache|socle|stand|support|silicone|skin|alimentation|power supply|tampas?|tapas?|carcaca|stickers?|autocollants?|protection|ventilateur|ventola|refroidissement|cooler|cooling|station de charge|charging|chargeur|dock seul|boite vide|boite seule|empty box|caja vacia|scatola|gashapon|figurine|lego|3d ?print|rangement|presentoir|tapis|kit|decoration|custom)\b'
       - '\b(?:playstation portal|ps portal|portal remote)\b|\bportal\b.*\bps ?5\b|\bps ?5\b.*\bportal\b'
     components: [{name: manettes/Joy-Con, match: 'joy ?cons?|manettes?|controllers?', share: 0.22}, {name: dock, match: 'dock|station|socle', share: 0.12}, {name: alimentation/câbles, match: 'chargeur|alimentation|cables?|hdmi|bloc secteur', share: 0.06}, {name: boîte, match: 'boite|carton', share: 0.03}]
@@ -358,6 +380,18 @@ niches:
       - {key: a6000, name: Sony A6000/A6100, match: ['a6[01]00'], resale: 330}
       - {key: ixus, name: Canon Ixus / Powershot Y2K, match: ['\bixus\b'], resale: 70, generic: true}
       - {key: gopro12, name: GoPro Hero 11-13, match: ['gopro hero ?1[1-3]'], resale: 230, new: 399}
+      - {key: sony_a7iii, name: Sony A7 III, match: ['a7 ?(?:iii|3|m3)\b'], exclude: ['objectif seul'], resale: 900}
+      - {key: sony_a7iv, name: Sony A7 IV, match: ['a7 ?(?:iv|4|m4)\b'], resale: 1450, new: 2299}
+      - {key: canon_r6, name: Canon EOS R6 / R6 II, match: ['eos ?r6'], resale: 1150}
+      - {key: canon_r50, name: Canon EOS R50 / R10, match: ['eos ?r(?:50|10)\b'], resale: 520}
+      - {key: canon_m50, name: Canon EOS M50, match: ['eos ?m50'], resale: 380}
+      - {key: nikon_z6, name: Nikon Z6 / Z6 II, match: ['nikon z ?6'], resale: 850}
+      - {key: fuji_xt4, name: Fujifilm X-T4 / X-T5, match: ['x ?t[45]\b'], resale: 1050}
+      - {key: fuji_xs10, name: Fujifilm X-S10 / X-S20, match: ['x ?s[12]0\b'], resale: 650}
+      - {key: dji_mini, name: DJI Mini 3 / Mini 4 Pro, match: ['dji mini ?[34]'], resale: 480, new: 799}
+      - {key: osmo_pocket3, name: DJI Osmo Pocket 3, match: ['osmo pocket ?3'], resale: 400, new: 539}
+      - {key: insta360_x3, name: Insta360 X3 / X4, match: ['insta ?360 (?:one )?x[34]'], resale: 300}
+      - {key: kindle_pw, name: Kindle Paperwhite / Oasis, match: ['kindle (?:paperwhite|oasis)'], resale: 80, generic: true}
 
   audio:
     name: "Audio & hi-fi"
@@ -386,6 +420,12 @@ niches:
       - {key: sl1200, name: Technics SL-1200/1210, match: ['sl ?12[01]0'], resale: 600, new: 1199}
       - {key: marshall, name: Enceinte Marshall, match: ['marshall.*(?:enceinte|speaker|stanmore|acton|woburn|emberton)'], resale: 120, new: 249, generic: true}
       - {key: sonos, name: Sonos, match: ['sonos'], resale: 150, new: 499, generic: true}
+      - {key: airpods_like_bose_ultra, name: Bose QuietComfort Ultra, match: ['quiet ?comfort ultra|qc ultra'], resale: 260, new: 449}
+      - {key: jbl_charge5, name: JBL Charge 5, match: ['jbl charge ?5'], resale: 90, new: 179}
+      - {key: jbl_flip6, name: JBL Flip 6, match: ['jbl flip ?6'], resale: 70, new: 139}
+      - {key: garmin_fenix, name: Garmin Fenix 6/7/8, match: ['fenix ?[678]'], resale: 330}
+      - {key: garmin_fr, name: Garmin Forerunner 255/265/955/965, match: ['forerunner ?(?:255|265|955|965)'], resale: 230}
+      - {key: galaxy_buds, name: Galaxy Buds 2 Pro / 3 Pro, match: ['galaxy buds ?(?:2 pro|3 pro)'], resale: 100}
 
   watches:
     name: "Montres"
@@ -583,8 +623,11 @@ niches:
     emoji: "📱"
     description: "Galaxy S/Z, Pixel : liquides, revente en quelques jours, mais vérif IMEI/verrouillage indispensable."
     enabled_by_default: true
-    queries: [samsung galaxy s24 ultra, samsung galaxy s24, samsung galaxy s23 ultra, samsung galaxy s23, galaxy z flip 5,
-              galaxy z fold 5, google pixel 8 pro, google pixel 8, google pixel 9, google pixel 7 pro]
+    queries: [samsung galaxy s24 ultra, samsung galaxy s24, samsung galaxy s23 ultra, samsung galaxy s23, samsung galaxy s23 fe,
+              samsung galaxy s22 ultra, samsung galaxy s22, samsung galaxy s21, samsung galaxy a55, samsung galaxy a54,
+              galaxy z flip 5, galaxy z flip 6, galaxy z fold 5, google pixel 9 pro, google pixel 9, google pixel 8 pro,
+              google pixel 8, google pixel 8a, google pixel 7a, google pixel 7 pro, google pixel 6 pro, xiaomi 14, xiaomi 13,
+              oneplus 12, oneplus 11, nothing phone 2]
     price_min: 60
     price_max: 1400
     shipping_eur: 5
@@ -612,3 +655,18 @@ niches:
       - {key: pixel8pro, name: Pixel 8 Pro, match: ['pixel ?8 ?pro'], resale: 450}
       - {key: pixel8, name: Pixel 8, match: ['pixel ?8\b'], exclude: ['pro'], resale: 330}
       - {key: pixel7pro, name: Pixel 7 Pro, match: ['pixel ?7 ?pro'], resale: 290}
+      - {key: pixel9pro, name: Pixel 9 Pro / XL, match: ['pixel ?9 ?pro'], resale: 680, new: 1099}
+      - {key: pixel8a, name: Pixel 8a, match: ['pixel ?8a'], resale: 300, new: 549}
+      - {key: pixel7a, name: Pixel 7a, match: ['pixel ?7a'], resale: 200}
+      - {key: pixel7, name: Pixel 7, match: ['pixel ?7\b'], exclude: ['pro', '7a'], resale: 220}
+      - {key: pixel6pro, name: Pixel 6 Pro, match: ['pixel ?6 ?pro'], resale: 190}
+      - {key: s23fe, name: Galaxy S23 FE, match: ['s23 ?fe'], resale: 270}
+      - {key: s22, name: Galaxy S22 / S22+, match: ['galaxy s22\b'], exclude: ['ultra'], resale: 260}
+      - {key: s21, name: Galaxy S21 / S21+ / Ultra, match: ['galaxy s21'], resale: 190, generic: true}
+      - {key: a55, name: Galaxy A55, match: ['galaxy a55'], resale: 240, new: 479}
+      - {key: a54, name: Galaxy A54, match: ['galaxy a54'], resale: 190}
+      - {key: xiaomi14, name: Xiaomi 14 / 14 Pro, match: ['xiaomi 14\b'], exclude: ['ultra', 't\b'], resale: 480}
+      - {key: xiaomi13, name: Xiaomi 13 / 13 Pro, match: ['xiaomi 13\b'], exclude: ['ultra', 'lite', 't\b'], resale: 330}
+      - {key: oneplus12, name: OnePlus 12, match: ['oneplus 12\b'], exclude: ['r\b'], resale: 520}
+      - {key: oneplus11, name: OnePlus 11, match: ['oneplus 11\b'], exclude: ['r\b'], resale: 330}
+      - {key: nothing2, name: Nothing Phone (2), match: ['nothing phone ?\(?2\b'], resale: 280}

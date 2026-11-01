@@ -151,6 +151,20 @@ class Niche(BaseModel):
         # Longest pattern wins: "airpods pro 2" beats "airpods pro"
         return max(hits, key=lambda m: max(len(p) for p in m.match)) if hits else None
 
+    @cached_property
+    def search_queries(self) -> list[str]:
+        """Curated queries + every precise catalog model ("Galaxy S23 FE", "PS5 Slim lecteur"...)."""
+        out = list(self.queries)
+        seen = {normalize(q) for q in out}
+        for m in self.models:
+            if m.generic:
+                continue
+            q = re.sub(r"\s*\(.*?\)|/.*$", "", m.name).strip()
+            if normalize(q) not in seen:
+                seen.add(normalize(q))
+                out.append(q)
+        return out
+
     def keywords(self) -> set[str]:
         words = set()
         for q in self.queries:

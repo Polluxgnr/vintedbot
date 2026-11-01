@@ -221,6 +221,8 @@ def gate_fails(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: Searc
                 fails.append(f"{mc.cheaper} annonces identiques moins chères")
             if mc.median and l.price > mc.median * 0.75:
                 fails.append(f"seulement {(1 - l.price / mc.median) * 100:.0f} % sous la médiane du marché")
+    if deal.wardrobe and deal.wardrobe.suspect:
+        fails.append("dressing du vendeur suspect : " + ", ".join(deal.wardrobe.flags[:2]))
     if deal.score < rs.min_score:
         fails.append(f"score {deal.score} < {rs.min_score}")
     return fails

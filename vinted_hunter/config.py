@@ -43,8 +43,9 @@ class Settings(BaseSettings):
     niches_file: Path = ROOT / "config" / "niches.yaml"
 
     # --- Engine --------------------------------------------------------------
-    watch_interval_s: int = 120         # how often each watch is re-polled
-    max_details_per_cycle: int = 8     # detail-page fetches per watch cycle (cascade on requests too)
+    watch_interval_s: int = 60          # how often each niche feed is re-polled (newest listings)
+    max_details_per_cycle: int = 4     # detail-page fetches per watch cycle: keep the budget for fresh listings
+    harvest: bool = True               # spend idle request budget growing the market database
     max_triage_per_cycle: int = 40
     max_vision_per_cycle: int = 6
 

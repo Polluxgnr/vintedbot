@@ -200,7 +200,7 @@ class HunterBot:
         app.add_handler(CallbackQueryHandler(self.on_setting, pattern=r"^s:"))
         app.add_handler(CallbackQueryHandler(self.on_more, pattern=r"^more$"))
         app.add_handler(CallbackQueryHandler(self.on_help, pattern=r"^h:"))
-        app.add_handler(CallbackQueryHandler(self.on_radar, pattern=r"^(?:tp|rv):"))
+        app.add_handler(CallbackQueryHandler(self.on_radar, pattern=r"^(?:tp|rv|rr):"))
         app.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.answer(), pattern=r"^noop$"))
         app.add_handler(CallbackQueryHandler(lambda u, c: u.callback_query.answer("Bouton expiré, relance la recherche")))
         app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.on_text))
@@ -730,6 +730,14 @@ class HunterBot:
             lines.append(f"  • {tiers.get(row['tier'], row['tier'])} — {row['calls']} appels · {row['cost']:.4f}$ "
                          f"<i>({v.e(row['model'].split('/')[-1])})</i>")
         lines += await self._database_lines()
+        learn = await self.db.learning_summary()
+        lines.append(f"\n🌾 <b>Récolte de données</b> : {self.hunter.harvested} nouvelles annonces stockées depuis le "
+                     f"démarrage ({self.hunter._harvest_steps} pages parcourues)")
+        lines.append(f"\n🧠 <b>Apprentissage</b> : {learn['models']} modèles calibrés sur {learn['obs']} annonces · "
+                     f"{learn['discovered']} modèles découverts par l'IA")
+        for m in learn["movers"]:
+            lines.append(f"  {'📈' if m['trend_pct'] > 0 else '📉'} {v.e(m['model_key'].split(':')[-1])} "
+                         f"{m['trend_pct']:+.0f} % (≈ {m['calibrated']:.0f} €)")
         if self.hunter.ai_notice:
             lines.append(f"\nℹ️ {v.e(self.hunter.ai_notice)}")
         await self._reply(update, "\n".join(lines))
@@ -771,29 +779,61 @@ class HunterBot:
             except TelegramError:
                 log.warning("digest not delivered to %s", chat_id)
 
-    async def _radar_screen(self, sort: str = "score", niche: str | None = None, page: int = 0,
-                            hours: int = 24) -> tuple[str, v.Kb]:
-        deals, total = await self.db.radar(hours=hours, sort=sort, niche=niche, limit=10, offset=page * 10)
+    async def _radar_screen(self, st: dict) -> tuple[str, v.Kb]:
+        per_page = 8
+        mp = v.RADAR_MIN_PROFITS[st["mp"]]
+        deals, total = await self.db.radar(hours=st["hours"], sort=st["sort"], niche=st["niche"], pepites=st["pep"],
+                                           analysed=st["ana"], min_profit=mp, limit=per_page,
+                                           offset=st["page"] * per_page)
         labels = {n.id: n.label for n in self.sv.niches}
-        return v.radar_view(deals, total, sort=sort, niche=niche, page=page, hours=hours,
-                            niches=await self.db.radar_niches(hours), labels=labels)
+        niches = await self.db.radar_niches(st["hours"], pepites=st["pep"], analysed=st["ana"], min_profit=mp)
+        return v.radar_view(deals, total, st, niches, labels, per_page)
 
     async def show_top(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        text, kb = await self._radar_screen()
+        text, kb = await self._radar_screen(v.radar_state())
         await self._reply(update, text, reply_markup=kb, link_preview_options=LinkPreviewOptions(is_disabled=True))
 
     async def on_radar(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         q = update.callback_query
-        await self._answer(update)
         if q.data.startswith("rv:"):
+            await self._answer(update)
             deal = await self.db.get_deal(int(q.data.split(":")[1]))
             if deal:
                 await self.send_deal(update.effective_chat.id, deal)
             return
-        _, sort, niche, page, hours = q.data.split(":")
-        text, kb = await self._radar_screen(sort, None if niche == "all" else niche, int(page), int(hours))
+        if q.data.startswith("rr:"):
+            await self._answer(update, "Vérification en direct sur Vinted…")
+            st = v.radar_state("tp:" + q.data[3:])
+            await self._refresh_radar(q, st)
+            return
+        await self._answer(update)
+        text, kb = await self._radar_screen(v.radar_state(q.data))
         try:
             await q.message.edit_text(text, reply_markup=kb, link_preview_options=LinkPreviewOptions(is_disabled=True))
+        except BadRequest:
+            pass
+
+    async def _refresh_radar(self, q, st: dict) -> None:
+        """Re-check the listings on screen: sold/deleted ones disappear, prices are refreshed."""
+        deals, _ = await self.db.radar(hours=st["hours"], sort=st["sort"], niche=st["niche"], pepites=st["pep"],
+                                       analysed=st["ana"], min_profit=v.RADAR_MIN_PROFITS[st["mp"]], limit=8,
+                                       offset=st["page"] * 8)
+        removed = 0
+        for i, d in enumerate(deals, 1):
+            try:
+                await q.message.edit_text(f"🔄 Vérification en direct {i}/{len(deals)}…")
+            except TelegramError:
+                pass
+            try:
+                status, price = await self.hunter.check_availability(d.listing.id)
+            except VintedUnavailable:
+                break
+            await self.db.update_radar_price(d.listing.id, status, price)
+            removed += status in ("sold", "gone")
+        text, kb = await self._radar_screen(st)
+        note = f"\n\n<i>✅ Vérifié à l'instant · {removed} annonce(s) vendue(s)/retirée(s) enlevée(s)</i>"
+        try:
+            await q.message.edit_text(text + note, reply_markup=kb, link_preview_options=LinkPreviewOptions(is_disabled=True))
         except BadRequest:
             pass
 

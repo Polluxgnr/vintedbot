@@ -182,6 +182,16 @@ class MarketCheck(BaseModel):
     percentile: float | None = None    # share of identical listings that are more expensive (1.0 = cheapest)
 
 
+class WardrobeCheck(BaseModel):
+    """What the seller's other listings say about them (fake seller, reseller, dumping account)."""
+
+    items: int = 0
+    same_model: int = 0                # other listings of the exact same model
+    cheap_branded: int = 0             # other branded/catalog items priced far under their value
+    flags: list[str] = Field(default_factory=list)
+    suspect: bool = False
+
+
 class Recommendation(StrEnum):
     BUY = "BUY"
     NEGOTIATE = "NEGOTIATE"
@@ -226,6 +236,8 @@ class Valuation(BaseModel):
     sold_count: int = 0                # confirmed sales of this model in the sales database
     days_to_sell: float | None = None  # median days a listing of this model stays on sale before selling
     sell_through: float | None = None  # share of tracked listings that sold
+    trend_pct: float | None = None     # last 7 days vs last 30 days, asking prices of this model
+    learned_n: int = 0                 # observations behind the learned reference price
 
 
 class Deal(BaseModel):
@@ -242,6 +254,7 @@ class Deal(BaseModel):
     seller_check: SellerCheck | None = None
     score_parts: dict[str, float] = Field(default_factory=dict)
     market_check: MarketCheck | None = None
+    wardrobe: WardrobeCheck | None = None
     pepite: bool = False               # passed every gate of the "insane deals only" filter
     gate_fails: list[str] = Field(default_factory=list)
 

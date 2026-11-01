@@ -143,6 +143,11 @@ class VintedClient:
             log.debug("Could not enrich %s: %s", listing.id, exc)
         return listing
 
+    async def seller_wardrobe(self, user_id: int) -> list[Listing]:
+        """The seller's other listings (first page of their profile)."""
+        page = await self._get(f"/member/{user_id}", as_json=False)
+        return parse_catalog_html(page, self.domain) if page else []
+
     async def item_status(self, item_id: int) -> tuple[str, float | None]:
         """Status for the sales database: active | reserved | sold | gone (404 = deleted or sold)."""
         page = await self._get(f"/items/{item_id}", as_json=False)

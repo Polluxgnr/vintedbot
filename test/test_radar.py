@@ -32,12 +32,17 @@ async def test_radar_sort_filter_and_render(tmp_path):
         assert total == 3 and by_profit[0].listing.id == 3          # Mac mini has the biggest profit
         only_consoles, n = await db.radar(niche="consoles")
         assert n == 2 and {d.listing.id for d in only_consoles} == {1, 2}
-        assert dict(await db.radar_niches())["consoles"] == 2
-        text, kb = radar_view(by_profit, total, sort="profit", niche=None, page=0, hours=24,
-                              niches=await db.radar_niches(), labels={n.id: n.label for n in CATALOG})
-        assert "3 bonnes affaires" in text and "Mac mini" not in text or "Item 3" in text
+        assert {nid: c for nid, c, _ in await db.radar_niches()}["consoles"] == 2
+        _, big_only = await db.radar(min_profit=100)
+        assert big_only == 1                                        # profit filter
+        await db.update_radar_price(3, "sold", None)
+        assert (await db.radar())[1] == 2                           # sold listings disappear
+        from vinted_hunter.bot.views import radar_state
+        st = radar_state("tp:profit:all:0:24:0:0:0")
+        text, kb = radar_view(by_profit, total, st, await db.radar_niches(), {n.id: n.label for n in CATALOG})
+        assert "3 affaires encore en ligne" in text
         assert any(b.callback_data == "rv:3" for row in kb.inline_keyboard for b in row)
-        assert (await db.get_deal(3)).listing.id == 3                # radar deals open as cards
+        assert (await db.get_deal(1)).listing.id == 1                # radar deals open as cards
         assert set((await db.cleanup()).keys()) == {"price_obs", "radar", "verdicts", "listings"}
     finally:
         await db.close()

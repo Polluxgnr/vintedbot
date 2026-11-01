@@ -216,7 +216,8 @@ _GRID_LINK_RE = re.compile(r'<a href="(/items/\d+[^"]*)"[^>]*--overlay-link" tit
 _GRID_IMG_RE = re.compile(r'<img src="([^"]+)"')
 _GRID_FAV_RE = re.compile(r'favourite-count-text">(\d+)<')
 _PRICE_RE = re.compile(r"(\d[\d\s \xa0]*(?:[.,]\d{1,2})?)\s*€")
-_FIELD_RE = re.compile(r", (Marque|Taille|État|Brand|Size|Condition): ([^,]+)")
+_FIELD_RE = re.compile(r", (marque|taille|état|etat|brand|size|condition) ?: ([^,]+)", re.I)
+_SELLER_ID_RE = re.compile(r'\\"seller_id\\":\\"?(\d+)')
 _PHOTO_RE = re.compile(r"https://images\d*\.vinted\.net/t/[^\"'\\\s]+/f800/[^\"'\\\s]+")
 _SELLER_RE = re.compile(
     r'\\"business\\":(true|false),\\"feedback_count\\":(\d+),\\"feedback_reputation\\":([\d.]+)'
@@ -235,7 +236,8 @@ def parse_grid_summary(summary: str) -> dict[str, Any]:
     """'Title, Marque: X, État: Y, 45.00 €, 47.95 €' -> fields. The title itself may contain commas."""
     summary = html.unescape(summary)
     prices = [p for p in (_price_text(m) for m in _PRICE_RE.findall(summary)) if p is not None]
-    fields = {k: v.strip() for k, v in _FIELD_RE.findall(summary)}
+    # Search pages write "Marque:", member pages "marque:" -> normalize the keys.
+    fields = {k.lower().replace("é", "e"): v.strip() for k, v in _FIELD_RE.findall(summary)}
     cut = len(summary)
     for m in (_FIELD_RE.search(summary), _PRICE_RE.search(summary)):
         if m:
@@ -243,9 +245,9 @@ def parse_grid_summary(summary: str) -> dict[str, Any]:
     title = summary[:cut].rstrip(" ,")
     return {
         "title": title,
-        "brand": fields.get("Marque") or fields.get("Brand"),
-        "size": fields.get("Taille") or fields.get("Size"),
-        "condition": fields.get("État") or fields.get("Condition"),
+        "brand": fields.get("marque") or fields.get("brand"),
+        "size": fields.get("taille") or fields.get("size"),
+        "condition": fields.get("etat") or fields.get("condition"),
         "price": prices[0] if prices else None,
         "total": prices[1] if len(prices) > 1 else None,
     }
@@ -320,7 +322,9 @@ def parse_item_page(page: str, listing: Listing | None = None, domain: str = "ww
     if m := _SELLER_RE.search(page):
         reviews = int(m.group(2))
         seen = _LAST_SEEN_RE.search(page)
-        update["seller"] = Seller(id=listing.seller.id if listing else 0, login=m.group(4),
+        sid = _SELLER_ID_RE.search(page)
+        seller_id = int(sid.group(1)) if sid else (listing.seller.id if listing else 0)
+        update["seller"] = Seller(id=seller_id, login=m.group(4),
                                   business=m.group(1) == "true", reviews=reviews,
                                   rating=round(float(m.group(3)) * 5, 2) if reviews else None,
                                   last_seen_at=parse_relative(seen.group(1)) if seen else None)

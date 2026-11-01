@@ -86,7 +86,7 @@ HELP_PAGES = {
         "plus elle monte.\n"
         "• <b>Accord entre les sources</b> : si la référence dit 200 € et le marché 210 €, confiance haute. "
         "Si l'une dit 100 € et l'autre 300 €, elle chute.\n\n"
-        "≥ 70 % : solide · 40–70 % : correct · < 40 % : à vérifier soi-même."
+        "≥ 70 % : solide · 40–70 % : correct · &lt; 40 % : à vérifier soi-même."
     ),
     "profit": (
         "💰 <b>Le profit net</b>\n\n"
@@ -114,18 +114,18 @@ HELP_PAGES = {
         "🛡 <b>La fiabilité du vendeur</b>\n\n"
         "Départ à 60 %, puis :\n"
         "• 0 avis −25 · moins de 5 avis −10 · 5–49 avis +10 · 50+ avis +20\n"
-        "• Note < 4,3★ −25 · ≥ 4,8★ (10+ avis) +10\n"
+        "• Note &lt; 4,3★ −25 · ≥ 4,8★ (10+ avis) +10\n"
         "• Inactif depuis 30+ jours −15 · actif aujourd'hui +5 · vendeur pro +5\n"
         "• Contact/paiement hors Vinted (WhatsApp, virement, numéro…) −50\n"
-        "• Prix < 35 % de la cote −20 · une seule photo −10 · description vide −5\n\n"
-        "🟢 ≥ 65 % · 🟡 40–65 % · 🔴 < 40 %"
+        "• Prix &lt; 35 % de la cote −20 · une seule photo −10 · description vide −5\n\n"
+        "🟢 ≥ 65 % · 🟡 40–65 % · 🔴 &lt; 40 %"
     ),
     "pepite": (
         "🔥 <b>Le filtre « pépites seulement »</b>\n\n"
         "Une alerte part seulement si TOUT est vrai :\n"
         "• modèle identifié précisément (pas une catégorie fourre-tout, pas un jeu/manette/carte/article enfant)\n"
         "• description lue en entier, pièces manquantes et défauts déduits\n"
-        "• prix ≥ 35 % sous la cote, mais pas < 30 % de la cote (= autre produit ou arnaque)\n"
+        "• prix ≥ 35 % sous la cote, mais pas &lt; 30 % de la cote (= autre produit ou arnaque)\n"
         "• profit ≥ 30 € (ou le min de la niche) et marge ≥ 40 %\n"
         "• confiance de la cote ≥ 60 %, score ≥ 70\n"
         "• vendeur pas 🔴, aucun signal d'arnaque\n"
@@ -141,7 +141,7 @@ HELP_PAGES = {
         "vérifier (6 annonces toutes les 10 min) : vendue, réservée, supprimée, ou baisse de prix.\n\n"
         "Ça donne, par modèle :\n"
         "• les <b>vrais prix de vente</b> (source la plus fiable de la cote, poids jusqu'à 1,2)\n"
-        "• le <b>délai de vente</b> médian (⚡ sur les cartes) → bonus « liquidité » au score (+6 si < 3 j, −4 si > 30 j)\n"
+        "• le <b>délai de vente</b> médian (⚡ sur les cartes) → bonus « liquidité » au score (+6 si &lt; 3 j, −4 si > 30 j)\n"
         "• le taux d'écoulement\n\n"
         "Les quasi-pépites sont suivies en priorité : si le vendeur baisse son prix et que l'annonce passe tous "
         "les filtres, tu reçois l'alerte. La base grossit d'elle-même : plus le bot tourne, plus il est précis."
@@ -201,6 +201,8 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
         lines.append(f"💰 {label} <b>{d.profit:+.0f} €</b> ({d.margin_pct:+.0f}%)")
     if d.market_check:
         lines.append(market_line(d))
+    if v.trend_pct is not None and abs(v.trend_pct) >= 5:
+        lines.append(f"{'📈' if v.trend_pct > 0 else '📉'} Tendance 7 j : {v.trend_pct:+.0f} % vs le mois")
     if v.sold_count >= 3 and v.days_to_sell is not None:
         lines.append(f"⚡ Ce modèle se vend en ~{v.days_to_sell:.0f} j ({v.sold_count} ventes suivies)")
     lines.append(f"⭐ Score <b>{d.score}</b>/100")
@@ -213,6 +215,9 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
     if sc:
         seller += f"  {sc.icon} {e(' · '.join(sc.reasons[:3]))}"
     lines.append(seller)
+    if d.wardrobe and d.wardrobe.flags:
+        icon = "🕵️⚠️" if d.wardrobe.suspect else "🕵️"
+        lines.append(f"{icon} Dressing : {e(' · '.join(d.wardrobe.flags[:2]))}")
     age = _age(l.age_minutes)
     extras = " · ".join(filter(None, [age and f"publiée {age}", f"❤️ {l.favourites}" if l.favourites else ""]))
     if extras:
@@ -254,53 +259,83 @@ def deal_keyboard(d: Deal) -> Kb:
     ])
 
 
-RADAR_SORT_LABELS = {"score": "⭐ Score", "profit": "💰 Profit", "marge": "📈 Marge", "remise": "🏷 Remise",
+RADAR_SORT_LABELS = {"valeur": "💎 Valeur", "profit": "💰 Profit", "marge": "📈 Marge", "remise": "🏷 Remise",
                      "recent": "🆕 Récent"}
 RADAR_PERIODS = {24: "24 h", 72: "3 j", 168: "7 j"}
+RADAR_MIN_PROFITS = [0, 20, 50, 100]
 
 
-def radar_view(deals: list[Deal], total: int, *, sort: str, niche: str | None, page: int, hours: int,
-               niches: list[tuple[str, int]], labels: dict[str, str], per_page: int = 10) -> tuple[str, Kb]:
-    """Sortable list of every good deal seen (pépites first when sorted by score)."""
-    scope = labels.get(niche, "toutes les niches") if niche else "toutes les niches"
-    head = (f"🏆 <b>Radar — {RADAR_PERIODS.get(hours, f'{hours} h')}</b> · {e(scope)} · "
-            f"tri {RADAR_SORT_LABELS.get(sort, sort)}\n{total} bonnes affaires")
-    lines = [head, ""]
+def radar_state(data: str | None = None) -> dict:
+    """Radar view state, packed in callback data: tp:sort:niche:page:hours:pepites:analysed:minprofit_index."""
+    parts = (data or "tp:valeur:all:0:24:0:0:0").split(":")
+    parts += ["0"] * (8 - len(parts))
+    return {"sort": parts[1] if parts[1] in RADAR_SORT_LABELS else "valeur", "niche": None if parts[2] == "all" else parts[2],
+            "page": int(parts[3]), "hours": int(parts[4]), "pep": parts[5] == "1", "ana": parts[6] == "1",
+            "mp": int(parts[7]) % len(RADAR_MIN_PROFITS)}
+
+
+def radar_cb(st: dict, **change) -> str:
+    s = {**st, **change}
+    return (f"tp:{s['sort']}:{s['niche'] or 'all'}:{s['page']}:{s['hours']}:{int(s['pep'])}:{int(s['ana'])}:{s['mp']}")
+
+
+def radar_view(deals: list[Deal], total: int, st: dict, niches: list[tuple[str, int, float]],
+               labels: dict[str, str], per_page: int = 8) -> tuple[str, Kb]:
+    """The radar: every live good deal, best expected profit first, with filters and a per-niche summary."""
+    scope = labels.get(st["niche"], "toutes niches") if st["niche"] else "toutes niches"
+    filters = [f for f, on in (("🔥 pépites", st["pep"]), ("🧠 analysées IA", st["ana"])) if on]
+    if RADAR_MIN_PROFITS[st["mp"]]:
+        filters.append(f"profit ≥ {RADAR_MIN_PROFITS[st['mp']]} €")
+    lines = [f"🏆 <b>Radar — {RADAR_PERIODS.get(st['hours'], str(st['hours']) + ' h')}</b> · {e(scope)}",
+             f"<i>{total} affaires encore en ligne · tri {RADAR_SORT_LABELS[st['sort']]}"
+             + (f" · {', '.join(filters)}" if filters else "") + "</i>"]
+    if niches and not st["niche"]:
+        summary = " · ".join(f"{labels.get(n, n).split(' ')[0]} {c} (max {b:+.0f} €)" for n, c, b in niches[:5])
+        lines.append(summary)
+    lines.append("")
     if not deals:
-        lines.append("Rien pour l'instant. Le radar se remplit au fil des scans (laisse tourner le bot).")
-    for i, d in enumerate(deals, start=page * per_page + 1):
+        lines.append("Rien avec ces filtres pour l'instant. Le radar se remplit à chaque scan : élargis la période "
+                     "ou retire un filtre.")
+    for i, d in enumerate(deals, start=st["page"] * per_page + 1):
         l, v = d.listing, d.valuation
-        tag = "🔥" if d.pepite else "•"
+        tags = "".join(t for t, on in (("🔥", d.pepite), ("🧠", bool(d.verdict and d.verdict.tier >= 2)),
+                                       ("📊", d.market_check is not None),
+                                       ("⚡", v.days_to_sell is not None and v.sold_count >= 3 and v.days_to_sell <= 7))
+                       if on)
         name = d.verdict.model_name if d.verdict and d.verdict.model_name else (l.model_name or l.title)
         disc = f" −{(1 - l.price / v.fair_value) * 100:.0f}%" if v.fair_value else ""
         seller = d.seller_check.icon if d.seller_check else ""
-        speed = f" ⚡{v.days_to_sell:.0f}j" if v.days_to_sell is not None and v.sold_count >= 3 else ""
         age = _age(l.age_minutes)
-        lines.append(f"{i}. {tag} <a href=\"{e(l.url)}\">{e(name[:42])}</a>")
-        lines.append(f"    {l.price:.0f} € → cote {v.fair_value or 0:.0f} €{disc} · <b>{d.profit or 0:+.0f} €</b> "
-                     f"({d.margin_pct or 0:+.0f}%) · ⭐{d.score} {seller}{speed}{' · ' + age if age else ''}")
+        lines.append(f"<b>{i}.</b> {tags} <a href=\"{e(l.url)}\">{e(name[:40])}</a>")
+        lines.append(f"     {l.price:.0f} € → {v.fair_value or 0:.0f} €{disc} · <b>{d.profit or 0:+.0f} €</b> "
+                     f"· conf. {v.confidence * 100:.0f}% {seller}{' · ' + age if age else ''}")
+    lines.append("\n<i>🔥 pépite · 🧠 analysée par l'IA · 📊 marché vérifié · ⚡ se vend en moins d'une semaine</i>")
     pages = max(1, -(-total // per_page))
-    n = niche or "all"
-    rows = [[Btn(("• " if k == sort else "") + lab, callback_data=f"tp:{k}:{n}:0:{hours}")
-             for k, lab in list(RADAR_SORT_LABELS.items())[:3]],
-            [Btn(("• " if k == sort else "") + lab, callback_data=f"tp:{k}:{n}:0:{hours}")
-             for k, lab in list(RADAR_SORT_LABELS.items())[3:]]
-            + [Btn(("• " if h == hours else "") + lab, callback_data=f"tp:{sort}:{n}:0:{h}")
-               for h, lab in RADAR_PERIODS.items()]]
-    niche_btns = [Btn(("• " if niche is None else "") + "Toutes", callback_data=f"tp:{sort}:all:0:{hours}")]
-    niche_btns += [Btn(("• " if nid == niche else "") + f"{labels.get(nid, nid)[:14]} ({cnt})",
-                       callback_data=f"tp:{sort}:{nid}:0:{hours}") for nid, cnt in niches[:8]]
+    sort_btns = [Btn(("• " if k == st["sort"] else "") + lab, callback_data=radar_cb(st, sort=k, page=0))
+                 for k, lab in RADAR_SORT_LABELS.items()]
+    rows = [sort_btns[:3], sort_btns[3:]]
+    rows.append([
+        Btn(("✅ " if st["pep"] else "") + "🔥 Pépites", callback_data=radar_cb(st, pep=not st["pep"], page=0)),
+        Btn(("✅ " if st["ana"] else "") + "🧠 Analysées", callback_data=radar_cb(st, ana=not st["ana"], page=0)),
+        Btn(f"💶 ≥ {RADAR_MIN_PROFITS[(st['mp'] + 1) % len(RADAR_MIN_PROFITS)]} €",
+            callback_data=radar_cb(st, mp=(st["mp"] + 1) % len(RADAR_MIN_PROFITS), page=0)),
+    ])
+    rows.append([Btn(("• " if h == st["hours"] else "") + lab, callback_data=radar_cb(st, hours=h, page=0))
+                 for h, lab in RADAR_PERIODS.items()])
+    niche_btns = [Btn(("• " if st["niche"] is None else "") + "Toutes", callback_data=radar_cb(st, niche=None, page=0))]
+    niche_btns += [Btn(("• " if nid == st["niche"] else "") + f"{labels.get(nid, nid)[:13]} ({cnt})",
+                       callback_data=radar_cb(st, niche=nid, page=0)) for nid, cnt, _ in niches[:8]]
     rows += [niche_btns[i:i + 3] for i in range(0, len(niche_btns), 3)]
     if deals:
         open_btns = [Btn(f"📄 {i}", callback_data=f"rv:{d.listing.id}")
-                     for i, d in enumerate(deals, start=page * per_page + 1)]
-        rows += [open_btns[i:i + 5] for i in range(0, len(open_btns), 5)]
+                     for i, d in enumerate(deals, start=st["page"] * per_page + 1)]
+        rows += [open_btns[i:i + 4] for i in range(0, len(open_btns), 4)]
     nav = []
-    if page > 0:
-        nav.append(Btn("◀️", callback_data=f"tp:{sort}:{n}:{page - 1}:{hours}"))
-    nav.append(Btn(f"{page + 1}/{pages}", callback_data="noop"))
-    if page + 1 < pages:
-        nav.append(Btn("▶️", callback_data=f"tp:{sort}:{n}:{page + 1}:{hours}"))
+    if st["page"] > 0:
+        nav.append(Btn("◀️", callback_data=radar_cb(st, page=st["page"] - 1)))
+    nav.append(Btn("🔄 Vérifier dispo", callback_data="rr:" + radar_cb(st)[3:]))
+    if st["page"] + 1 < pages:
+        nav.append(Btn("▶️", callback_data=radar_cb(st, page=st["page"] + 1)))
     rows.append(nav)
     return "\n".join(lines)[:4000], Kb(rows)
 
@@ -328,6 +363,8 @@ def explain_deal(d: Deal) -> str:
         out.append("  • aucune source : modèle inconnu et trop peu d'annonces comparables")
     if v.new_price:
         out.append(f"  • prix neuf ≈ {v.new_price:.0f} €")
+    if v.learned_n:
+        out.append(f"  • référence apprise sur {v.learned_n} annonces des 30 derniers jours (remplace peu à peu la cote de départ)")
     if v.sold_count:
         st = f", écoulement {v.sell_through * 100:.0f} %" if v.sell_through is not None else ""
         dts = f", vendu en ~{v.days_to_sell:.0f} j" if v.days_to_sell is not None else ""

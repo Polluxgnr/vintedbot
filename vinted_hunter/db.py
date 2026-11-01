@@ -73,6 +73,13 @@ CREATE TABLE IF NOT EXISTS radar (
     price REAL, pepite INTEGER DEFAULT 0, data TEXT, seen_at TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_radar_seen ON radar(seen_at);
+
+-- Learned prices: recomputed every 6 h from everything observed and sold. Replaces the YAML seed
+-- prices progressively, so valuations improve the longer the bot runs.
+CREATE TABLE IF NOT EXISTS model_stats (
+    model_key TEXT PRIMARY KEY, n INTEGER, calibrated REAL, ask_median REAL, sold_median REAL,
+    median_7d REAL, median_30d REAL, trend_pct REAL, updated_at TEXT, upper_calibrated REAL
+);
 """
 
 
@@ -88,6 +95,7 @@ class Database:
     def __init__(self, path: Path):
         self.path = path
         self._conn: aiosqlite.Connection | None = None
+        self._stats_cache: dict[str, dict | None] = {}
 
     async def connect(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -96,6 +104,14 @@ class Database:
         await self._conn.execute("PRAGMA journal_mode=WAL")
         await self._conn.execute("PRAGMA synchronous=NORMAL")
         await self._conn.executescript(SCHEMA)
+        cols = {r[1] for r in await (await self._conn.execute("PRAGMA table_info(model_stats)")).fetchall()}
+        if "upper_calibrated" not in cols:
+            await self._conn.execute("ALTER TABLE model_stats ADD COLUMN upper_calibrated REAL")
+        radar_cols = {r[1] for r in await (await self._conn.execute("PRAGMA table_info(radar)")).fetchall()}
+        for col, decl in (("expected", "REAL"), ("tier", "INTEGER DEFAULT 1"), ("scam", "INTEGER DEFAULT 0"),
+                          ("verified", "INTEGER DEFAULT 0")):
+            if col not in radar_cols:
+                await self._conn.execute(f"ALTER TABLE radar ADD COLUMN {col} {decl}")
         await self._conn.commit()
 
     async def close(self) -> None:
@@ -202,6 +218,74 @@ class Database:
             "sell_through": round(closed / len(rows), 2) if len(rows) >= 5 else None,
         }
 
+    async def calibrate(self, min_obs: int = 15) -> int:
+        """Learn each model's 'very good' resale price from its last 30 days of observations and sales.
+
+        Asking prices are condition-normalized, outliers trimmed, then discounted 10 % (asks are not sales);
+        confirmed sales, when there are enough, are trusted more. Also computes the 7-day vs 30-day trend.
+        """
+        from .market import ASK_TO_SALE, robust_center
+
+        since30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        since7 = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+        keys = await self._all(
+            "SELECT model_key, COUNT(*) AS n FROM price_obs WHERE observed_at>=? AND model_key IS NOT NULL "
+            "AND model_key NOT LIKE 'sig:%' GROUP BY model_key HAVING n>=?", (since30, min_obs))
+        updated = 0
+        for row in keys:
+            key = row["model_key"]
+            obs = await self._all("SELECT price, condition, observed_at FROM price_obs WHERE model_key=? AND observed_at>=?",
+                                  (key, since30))
+            base = [(r["price"] / Condition.parse(r["condition"]).value_factor, r["observed_at"]) for r in obs if r["price"]]
+            if len(base) < min_obs:
+                continue
+            ask, _, _ = robust_center([b for b, _ in base])
+            # Fake-prone categories: the cheap end is full of fakes and partial items -> also learn the upper market.
+            ordered = sorted(b for b, _ in base)
+            upper = robust_center(ordered[int(len(ordered) * 0.4):])[0] * ASK_TO_SALE
+            recent = [b for b, t in base if t >= since7]
+            med7 = robust_center(recent)[0] if len(recent) >= 5 else None
+            sales = await self.sales(key, days=60)
+            sold = [p / c.value_factor for p, c in sales["prices"]]
+            sold_med = robust_center(sold)[0] if len(sold) >= 3 else None
+            calibrated = ask * ASK_TO_SALE
+            if sold_med:
+                w = min(0.7, len(sold) / 20)
+                calibrated = calibrated * (1 - w) + sold_med * w
+            trend = round((med7 / ask - 1) * 100, 1) if med7 else None
+            await self.conn.execute(
+                """INSERT INTO model_stats(model_key, n, calibrated, ask_median, sold_median, median_7d, median_30d,
+                                           trend_pct, updated_at, upper_calibrated) VALUES (?,?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(model_key) DO UPDATE SET n=excluded.n, calibrated=excluded.calibrated,
+                       ask_median=excluded.ask_median, sold_median=excluded.sold_median, median_7d=excluded.median_7d,
+                       median_30d=excluded.median_30d, trend_pct=excluded.trend_pct, updated_at=excluded.updated_at,
+                       upper_calibrated=excluded.upper_calibrated""",
+                (key, len(base), round(calibrated, 2), round(ask, 2), sold_med and round(sold_med, 2),
+                 med7 and round(med7, 2), round(ask, 2), trend, _now(), round(upper, 2)))
+            updated += 1
+        await self.conn.commit()
+        self._stats_cache.clear()
+        return updated
+
+    async def model_stats(self, model_key: str | None) -> dict | None:
+        if not model_key or model_key.startswith("sig:"):
+            return None
+        if model_key not in self._stats_cache:
+            row = await self._one("SELECT * FROM model_stats WHERE model_key=?", (model_key,))
+            self._stats_cache[model_key] = dict(row) if row else None
+        return self._stats_cache[model_key]
+
+    async def learning_summary(self) -> dict[str, Any]:
+        row = await self._one("SELECT COUNT(*) AS models, COALESCE(SUM(n),0) AS obs, MAX(updated_at) AS at FROM model_stats")
+        discovered = await self._one(
+            "SELECT COUNT(*) AS n FROM (SELECT model_key FROM listings WHERE model_key LIKE 'ai:%' "
+            "GROUP BY model_key HAVING COUNT(*) >= 3)")
+        movers = await self._all(
+            "SELECT model_key, trend_pct, calibrated FROM model_stats WHERE trend_pct IS NOT NULL "
+            "AND ABS(trend_pct) >= 5 ORDER BY ABS(trend_pct) DESC LIMIT 5")
+        return {"models": row["models"], "obs": row["obs"], "updated_at": row["at"],
+                "discovered": discovered["n"], "movers": [dict(m) for m in movers]}
+
     async def tracking_totals(self) -> dict[str, int]:
         rows = await self._all("SELECT status, COUNT(*) AS n FROM tracking GROUP BY status")
         return {r["status"]: r["n"] for r in rows}
@@ -281,38 +365,73 @@ class Database:
         for d in deals:
             fv = d.valuation.fair_value or 0
             discount = round((1 - d.listing.price / fv) * 100, 1) if fv else None
+            expected = round((d.profit or 0) * d.valuation.confidence, 2)      # profit you can count on
+            scam = int(bool(d.inspection and d.inspection.scams) or bool(d.wardrobe and d.wardrobe.suspect))
             await self.conn.execute(
-                """INSERT INTO radar(listing_id, niche_id, score, profit, margin, discount, price, pepite, data, seen_at)
-                   VALUES (?,?,?,?,?,?,?,?,?,?)
+                """INSERT INTO radar(listing_id, niche_id, score, profit, margin, discount, price, pepite, data, seen_at,
+                                     expected, tier, scam, verified)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                    ON CONFLICT(listing_id) DO UPDATE SET score=excluded.score, profit=excluded.profit,
                        margin=excluded.margin, discount=excluded.discount, price=excluded.price,
-                       pepite=MAX(radar.pepite, excluded.pepite), data=excluded.data""",
+                       pepite=MAX(radar.pepite, excluded.pepite), data=excluded.data, expected=excluded.expected,
+                       tier=MAX(radar.tier, excluded.tier), scam=excluded.scam,
+                       verified=MAX(radar.verified, excluded.verified)""",
                 (d.listing.id, d.listing.niche_id, d.score, d.profit, d.margin_pct, discount, d.listing.price,
-                 int(d.pepite), d.model_dump_json(), now),
+                 int(d.pepite), d.model_dump_json(), now, expected, d.verdict.tier if d.verdict else 1, scam,
+                 int(d.market_check is not None)),
             )
         await self.conn.commit()
 
-    RADAR_SORTS = {"score": "pepite DESC, score DESC", "profit": "profit DESC", "marge": "margin DESC",
-                   "remise": "discount DESC", "recent": "seen_at DESC"}
+    RADAR_SORTS = {"valeur": "r.pepite DESC, r.expected DESC", "score": "r.pepite DESC, r.score DESC",
+                   "profit": "r.profit DESC", "marge": "r.margin DESC", "remise": "r.discount DESC",
+                   "recent": "r.seen_at DESC"}
 
-    async def radar(self, *, hours: int = 24, sort: str = "score", niche: str | None = None,
-                    limit: int = 10, offset: int = 0) -> tuple[list[Deal], int]:
+    def _radar_where(self, hours: int, niche: str | None, pepites: bool, analysed: bool,
+                     min_profit: float) -> tuple[str, list]:
         since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        where, args = "seen_at>=?", [since]
+        # Sold, reserved-then-gone or deleted listings and anything scam-flagged never show up.
+        where = ["r.seen_at>=?", "r.scam=0", "COALESCE(t.status,'active') IN ('active','reserved')"]
+        args: list = [since]
         if niche:
-            where += " AND niche_id=?"
+            where.append("r.niche_id=?")
             args.append(niche)
-        total = (await self._one(f"SELECT COUNT(*) AS n FROM radar WHERE {where}", tuple(args)))["n"]
+        if pepites:
+            where.append("r.pepite=1")
+        if analysed:
+            where.append("r.tier>=2")
+        if min_profit:
+            where.append("r.profit>=?")
+            args.append(min_profit)
+        return " AND ".join(where), args
+
+    async def radar(self, *, hours: int = 24, sort: str = "valeur", niche: str | None = None, pepites: bool = False,
+                    analysed: bool = False, min_profit: float = 0, limit: int = 10,
+                    offset: int = 0) -> tuple[list[Deal], int]:
+        where, args = self._radar_where(hours, niche, pepites, analysed, min_profit)
+        base = f"FROM radar r LEFT JOIN tracking t ON t.listing_id=r.listing_id WHERE {where}"
+        total = (await self._one(f"SELECT COUNT(*) AS n {base}", tuple(args)))["n"]
         rows = await self._all(
-            f"SELECT data FROM radar WHERE {where} ORDER BY {self.RADAR_SORTS.get(sort, 'score DESC')} LIMIT ? OFFSET ?",
+            f"SELECT r.data {base} ORDER BY {self.RADAR_SORTS.get(sort, self.RADAR_SORTS['valeur'])} LIMIT ? OFFSET ?",
             (*args, limit, offset))
         return [Deal.model_validate_json(r["data"]) for r in rows], total
 
-    async def radar_niches(self, hours: int = 24) -> list[tuple[str, int]]:
-        since = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
-        rows = await self._all("SELECT niche_id, COUNT(*) AS n FROM radar WHERE seen_at>=? AND niche_id IS NOT NULL "
-                               "GROUP BY niche_id ORDER BY n DESC", (since,))
-        return [(r["niche_id"], r["n"]) for r in rows]
+    async def radar_niches(self, hours: int = 24, *, pepites: bool = False, analysed: bool = False,
+                           min_profit: float = 0) -> list[tuple[str, int, float]]:
+        """Per niche: number of live deals and best profit."""
+        where, args = self._radar_where(hours, None, pepites, analysed, min_profit)
+        rows = await self._all(
+            f"SELECT r.niche_id, COUNT(*) AS n, MAX(r.profit) AS best FROM radar r "
+            f"LEFT JOIN tracking t ON t.listing_id=r.listing_id WHERE {where} AND r.niche_id IS NOT NULL "
+            "GROUP BY r.niche_id ORDER BY n DESC", tuple(args))
+        return [(r["niche_id"], r["n"], r["best"] or 0) for r in rows]
+
+    async def update_radar_price(self, listing_id: int, status: str, price: float | None) -> None:
+        """After a live availability check: remove dead listings, refresh prices."""
+        if status in ("sold", "gone"):
+            await self.conn.execute("DELETE FROM radar WHERE listing_id=?", (listing_id,))
+        elif price is not None:
+            await self.conn.execute("UPDATE radar SET price=? WHERE listing_id=?", (price, listing_id))
+        await self.conn.commit()
 
     async def cleanup(self) -> dict[str, int]:
         """Retention: keep the database fast. Sales history (tracking) is kept; raw noise is not."""

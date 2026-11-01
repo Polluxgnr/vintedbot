@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import logging
 import statistics
 import time
@@ -22,7 +23,7 @@ from .ai.llm import BudgetExceeded
 from .config import RuntimeSettings, Settings
 from .db import Database
 from .market import estimate, robust_center
-from .models import AIVerdict, Condition, Deal, Listing, MarketCheck, SearchSpec
+from .models import AIVerdict, Condition, Deal, Listing, MarketCheck, SearchSpec, WardrobeCheck
 from .niches import STOPWORDS, Niche, NicheCatalog, normalize, signature_key
 from .scoring import build_deal, gate_fails, is_alert_worthy, radar_worthy, reference_of, reject_reason
 from .vinted.client import VintedClient, VintedUnavailable
@@ -54,7 +55,11 @@ class Hunter:
         self._last_tracker = 0.0
         self._yield: dict[int, float] = {}                 # watch -> recent good-deal yield (EWMA)
         self._last_cleanup = 0.0
-        self._interactive = 0                          # user requests in flight: background loops yield to them
+        self._interactive = 0
+        self._harvest = self._harvest_jobs()
+        self._harvest_steps = 0
+        self.harvested = 0
+        self._last_calibration = 0.0                          # user requests in flight: background loops yield to them
         self.ai_notice: str | None = None   # last budget / API problem, surfaced in /stats
 
     # ============================================================ cascade
@@ -78,7 +83,8 @@ class Hunter:
             key = listing.model_key.split(":", 1)[1]
             ref = next((m for m in niche.models if m.key == key), None)
         comps = await self.db.comparables(listing.model_key, exclude_id=listing.id) if listing.model_key else []
-        if len(comps) < 4 and not ref and pool and pool[0] <= set(normalize(listing.title).split()):
+        guarded = niche is not None and any(re.search(g, normalize(listing.title)) for g in niche.model_guard)
+        if len(comps) < 4 and not ref and pool and not guarded and pool[0] <= set(normalize(listing.title).split()):
             pool_median = statistics.median(p for p, _ in pool[1])
             # A 40 € "PS5 slim power supply" must not borrow the price of PS5 Slim consoles.
             if listing.price >= pool_median * MODEL_PRICE_FLOOR:
@@ -90,12 +96,24 @@ class Hunter:
         new_price = (ref.new if ref else None) or (verdict.new_price if verdict else None)
         sales = await self.db.sales(listing.model_key) if listing.model_key and not listing.model_key.startswith("sig:") \
             else None
-        valuation = estimate(listing.condition, reference=ref.resale if ref else None, comps=comps,
+        reference = ref.resale if ref else None
+        learned = await self.db.model_stats(listing.model_key) if ref else None
+        if learned and reference:
+            # The database learns: the seed price fades out as real observations accumulate. Guardrails keep a
+            # polluted category (fakes, single earbuds...) from dragging a model to an absurd price.
+            fake_prone = niche is not None and niche.authenticity_risk in ("high", "very_high")
+            value = learned["upper_calibrated"] if fake_prone and learned.get("upper_calibrated") else learned["calibrated"]
+            value = min(max(value, reference * 0.6), reference * 1.5)
+            w = min(0.85, learned["n"] / 80)
+            reference = round(reference * (1 - w) + value * w, 2)
+        valuation = estimate(listing.condition, reference=reference, comps=comps,
                              ai_estimate=ai_estimate, ai_weight=ai_weight, new_price=new_price,
                              sold=sales["prices"] if sales else None)
         if sales:
             valuation = valuation.model_copy(update={"sold_count": sales["sold"], "days_to_sell": sales["median_days"],
                                                      "sell_through": sales["sell_through"]})
+        if learned:
+            valuation = valuation.model_copy(update={"trend_pct": learned["trend_pct"], "learned_n": learned["n"]})
         return build_deal(listing, valuation, niche, rs, verdict, spec)
 
     def query_pool(self, listings: list[Listing], query: str, niche: Niche | None,
@@ -106,7 +124,7 @@ class Hunter:
         otherwise a Switch game would borrow the price of Switch consoles.
         """
         words = set(normalize(query).split()) - STOPWORDS
-        if not words:
+        if not words or (niche and niche.identify(query)):
             return None
         prices = [(l.price, l.condition) for l in listings
                   if words <= set(normalize(l.title).split()) and not reject_reason(l, niche, None)]
@@ -136,7 +154,7 @@ class Hunter:
             return mode == "full" or d.profit is None or d.profit >= min_profit * 0.4
 
         candidates = sorted((d for d in deals if promising(d)), key=lambda d: d.score, reverse=True)
-        limit = {"watch": self.s.max_details_per_cycle, "hunt": 15, "full": 5}[mode]
+        limit = {"watch": self.s.max_details_per_cycle, "hunt": 10, "full": 5}[mode]
         candidates = candidates[:limit]
         await progress(f"🧮 {len(survivors)}/{len(listings)} annonces gardées · {len(candidates)} prometteuses")
 
@@ -145,6 +163,8 @@ class Hunter:
         for i, d in enumerate(candidates, 1):
             l = d.listing
             await progress(f"📖 Lecture des descriptions {i}/{len(candidates)}")
+            if mode == "watch" and self._interactive:
+                break                                   # the user started a search: free Vinted for them
             if not l.details_loaded:
                 try:
                     l = self._identify(await self.vinted.enrich(l), niche)
@@ -156,7 +176,7 @@ class Hunter:
 
         verdicts: dict[int, AIVerdict] = {l.id: cached[l.id] for l in enriched if cached.get(l.id)}
         if not self.ai.enabled:
-            return await self._finalize(enriched, verdicts, niche, spec, rs, deals, pool)
+            return await self._finalize(enriched, verdicts, niche, spec, rs, deals, pool, analysed_only=mode == "hunt")
 
         try:
             # ---- tier 2: batched text triage
@@ -211,14 +231,15 @@ class Hunter:
             self.ai_notice = f"Erreur IA: {exc}"
             log.exception("AI tier failed")
 
-        return await self._finalize(enriched, verdicts, niche, spec, rs, deals, pool)
+        return await self._finalize(enriched, verdicts, niche, spec, rs, deals, pool, analysed_only=mode == "hunt")
 
     async def _finalize(self, enriched: list[Listing], verdicts: dict[int, AIVerdict], niche: Niche | None,
                         spec: SearchSpec | None, rs: RuntimeSettings, tier1: list[Deal],
-                        pool: Pool | None = None) -> list[Deal]:
+                        pool: Pool | None = None, analysed_only: bool = False) -> list[Deal]:
         seen = {l.id for l in enriched}
         final = [await self._value(l, niche, rs, spec, verdicts.get(l.id), pool) for l in enriched]
-        final += [d for d in tier1 if d.listing.id not in seen]
+        if not analysed_only:
+            final += [d for d in tier1 if d.listing.id not in seen]
         return sorted(final, key=lambda d: d.score, reverse=True)
 
     async def _ai_rekey(self, listing: Listing, v: AIVerdict | None, niche: Niche | None) -> Listing:
@@ -254,7 +275,7 @@ class Hunter:
             return self._gate(deal, niche, rs, spec)
         query = ref.name.split("(")[0].split("/")[0].strip()
         found: dict[int, Listing] = {}
-        for order in ("relevance", "price_low_to_high"):
+        for order in ("price_low_to_high",):
             try:
                 for l in await self.vinted.search(SearchSpec(query=query), order=order):
                     found.setdefault(l.id, l)
@@ -267,20 +288,77 @@ class Hunter:
         await self.db.track(same)
 
         mine = deal.listing.condition.value_factor
-        # Compare like with like: every price expressed in this listing's condition.
-        norm = sorted(l.price / l.condition.value_factor * mine for l in same)
+        # Compare like with like: every price expressed in this listing's condition. The live page gives the
+        # cheapest identical listings (rank); the stored comparables of the last 2 weeks complete the median.
+        stored = await self.db.comparables(deal.listing.model_key or "", days=14, exclude_id=deal.listing.id)
+        live_ids = {l.id for l in same}
+        norm = sorted([l.price / l.condition.value_factor * mine for l in same]
+                      + [p / c.value_factor * mine for p, c in stored][: max(0, 60 - len(live_ids))])
         check = MarketCheck(n=len(norm))
         if norm:
             median, q1, _ = robust_center(norm)
             check.median, check.p25 = round(median, 2), round(q1, 2)
-            check.cheaper = sum(1 for p in norm if p < deal.listing.price - 0.01)
+            check.cheaper = sum(1 for l in same if l.price / l.condition.value_factor * mine < deal.listing.price - 0.01)
             check.cheapest_other = round(norm[0], 2)
             check.percentile = round(1 - check.cheaper / len(norm), 2)
         # Re-value with the fresh comparables, keep the check, then apply the gate.
         fresh = await self._value(deal.listing, niche, rs, spec, deal.verdict)
-        fresh = fresh.model_copy(update={"market_check": check, "watch_id": deal.watch_id,
+        # Seller's wardrobe: only when the deal is otherwise a contender (1 request).
+        wardrobe = None
+        pre = fresh.model_copy(update={"market_check": check})
+        if not [f for f in gate_fails(pre, niche, rs, spec) if not f.startswith("score")]:
+            wardrobe = await self.check_wardrobe(pre, niche)
+        fresh = fresh.model_copy(update={"market_check": check, "watch_id": deal.watch_id, "wardrobe": wardrobe,
                                          "flags": list(dict.fromkeys(fresh.flags + [f for f in deal.flags if f == "baisse_prix"]))})
         return self._gate(fresh, niche, rs, spec)
+
+    async def check_availability(self, listing_id: int) -> tuple[str, float | None]:
+        """Live status of one listing (user-triggered: takes priority over background scanning)."""
+        self._interactive += 1
+        try:
+            status, price = await self.vinted.item_status(listing_id)
+        finally:
+            self._interactive -= 1
+        await self.db.update_tracking(listing_id, status, price)
+        return status, price
+
+    async def check_wardrobe(self, deal: Deal, niche: Niche | None) -> WardrobeCheck | None:
+        """Look at the seller's other listings before calling something a pépite.
+
+        Red flags: several copies of the same model (fake seller / undeclared reseller), many branded items
+        at knock-down prices (fake stock), a brand-new account with a big stock.
+        """
+        seller = deal.listing.seller
+        if not seller.id:
+            return None
+        try:
+            items = [l for l in await self.vinted.seller_wardrobe(seller.id) if l.id != deal.listing.id]
+        except VintedUnavailable:
+            return None
+        check = WardrobeCheck(items=len(items))
+        for item in items:
+            for n in self.niches:
+                ref = n.identify(item.title)
+                if not ref:
+                    continue
+                if niche and n.id == niche.id and f"{n.id}:{ref.key}" == deal.listing.model_key:
+                    check.same_model += 1
+                if not ref.generic and item.price < ref.resale * 0.4:
+                    check.cheap_branded += 1
+                break
+        fake_prone = niche is not None and niche.authenticity_risk in ("high", "very_high")
+        if check.same_model >= 2:
+            check.flags.append(f"vend {check.same_model + 1} exemplaires du même modèle")
+            check.suspect = check.suspect or fake_prone or check.same_model >= 4
+        if check.cheap_branded >= 2:
+            check.flags.append(f"{check.cheap_branded} autres articles de marque à prix cassés")
+            check.suspect = True
+        if (seller.reviews or 0) == 0 and check.items >= 15:
+            check.flags.append(f"compte sans avis avec {check.items} articles en vente")
+            check.suspect = True
+        if not check.flags and check.items:
+            check.flags.append(f"{check.items} autres articles, rien de suspect")
+        return check
 
     @staticmethod
     def _gate(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: SearchSpec | None) -> Deal:
@@ -300,11 +378,12 @@ class Hunter:
         queries = [spec.query] if spec.query else (niche.queries[:4] if niche else [])
         found: dict[int, Listing] = {}
         await progress("🔎 Recherche sur Vinted")
-        pages = [(q, o, p) for q in queries for o, p in (("relevance", 1), ("newest_first", 1), ("relevance", 2))]
+        orders = (("relevance", 1), ("newest_first", 1))
+        pages = [(q, o, p) for q in queries for o, p in orders]
         done = 0
         for q in queries:
             sub = spec.model_copy(update={"query": q})
-            for order, page in (("relevance", 1), ("newest_first", 1), ("relevance", 2)):
+            for order, page in orders:
                 try:
                     for l in await self.vinted.search(sub, order=order, page=page):
                         found.setdefault(l.id, l)
@@ -320,7 +399,7 @@ class Hunter:
         # Verify the market for the most promising few (everything except the market gate already passes,
         # or at least the money side does).
         shortlist = [d for d in deals if not [f for f in gate_fails(d, niche, rs, spec, require_market=False)
-                                              if f.startswith(("profit", "remise", "prix <", "modèle"))]][:4]
+                                              if f.startswith(("profit", "remise", "prix <", "modèle"))]][:3]
         if shortlist:
             await progress(f"📊 Comparaison au marché en direct 0/{len(shortlist)}")
         checked = {}
@@ -410,12 +489,15 @@ class Hunter:
         rs = await self.db.runtime_settings(chat_id)
 
         if watch["kind"] == "niche" and niche:
-            idx = self._query_cursor[watch["id"]] % len(niche.queries)
+            queries = niche.search_queries
+            idx = self._query_cursor[watch["id"]] % len(queries)
             self._query_cursor[watch["id"]] += 1
-            sub = spec.model_copy(update={"query": niche.queries[idx]})
+            sub = spec.model_copy(update={"query": queries[idx]})
         else:
             sub = spec
 
+        if self._interactive:
+            return 0
         listings = await self.vinted.search(sub, order="newest_first", per_page=96)
         known = await self.db.known_prices([l.id for l in listings])
         fresh = [l for l in listings if l.id not in known or l.price < known[l.id] - 0.5]
@@ -476,6 +558,34 @@ class Hunter:
         row = await self.db._one("SELECT COUNT(*) AS n FROM radar")
         return row["n"] if row else 0
 
+    def _harvest_jobs(self):
+        """Endless crawl plan over EVERY niche and model: cheapest first (where mispricings are), then relevance,
+        then deeper pages. Only feeds the database (prices, sales tracking) - no AI, no alerts."""
+        while True:
+            for order, page in (("price_low_to_high", 1), ("relevance", 1), ("relevance", 2), ("newest_first", 2),
+                                ("price_low_to_high", 2), ("relevance", 3)):
+                for niche in self.niches:
+                    for query in niche.search_queries:
+                        yield niche, query, order, page
+
+    async def harvest_step(self) -> int:
+        """One request of database growth. Returns the number of listings never seen before."""
+        niche, query, order, page = next(self._harvest)
+        listings = await self.vinted.search(SearchSpec(query=query), order=order, page=page)
+        if not listings:
+            return 0
+        known = await self.db.known_prices([l.id for l in listings])
+        listings = [self._identify(l, niche) for l in listings]
+        await self.db.upsert_listings(listings)
+        await self.db.track(listings)
+        new = sum(1 for l in listings if l.id not in known)
+        self.harvested += new
+        self._harvest_steps += 1
+        if self._harvest_steps % 50 == 0:
+            log.info("harvester: %s steps, %s new listings stored (last: %s / %s p%s)",
+                     self._harvest_steps, self.harvested, niche.id, query, page)
+        return new
+
     async def run_tracker(self, notify: Notify, batch: int = 6) -> int:
         """Re-check a few tracked listings: record sales, and re-evaluate near misses whose price dropped."""
         changed = 0
@@ -518,6 +628,12 @@ class Hunter:
                     log.info("database cleanup: %s", await self.db.cleanup())
                 except Exception:
                     log.exception("cleanup failed")
+            if time.monotonic() - self._last_calibration > 6 * 3600:   # learn prices from what was seen and sold
+                self._last_calibration = time.monotonic()
+                try:
+                    log.info("price calibration: %s models updated", await self.db.calibrate())
+                except Exception:
+                    log.exception("calibration failed")
             if time.monotonic() - self._last_tracker > 600:     # sales database: 6 checks / 10 min
                 self._last_tracker = time.monotonic()
                 try:
@@ -525,6 +641,7 @@ class Hunter:
                         log.info("sales tracker: %s listing(s) changed status", n)
                 except Exception:
                     log.exception("sales tracker failed")
+            ran_watch = False
             try:
                 for w in await self.db.watches(active_only=True):
                     if self._interactive:
@@ -532,6 +649,7 @@ class Hunter:
                     if time.monotonic() - self._last_run.get(w["id"], 0) < self._interval(w["id"]):
                         continue
                     self._last_run[w["id"]] = time.monotonic()
+                    ran_watch = True
                     try:
                         before = await self._radar_count()
                         hits = await self.run_watch(w, notify)
@@ -546,4 +664,14 @@ class Hunter:
                         log.exception("watch %s failed", w["id"])
             except Exception:
                 log.exception("watch loop iteration failed")
-            await asyncio.sleep(3)
+            if not ran_watch and not self._interactive and self.s.harvest:
+                # Nothing due: spend the idle request budget growing the market database.
+                try:
+                    await self.harvest_step()
+                except VintedUnavailable as exc:
+                    log.warning("%s", exc)
+                    await asyncio.sleep(self.vinted.cooldown_remaining + 1)
+                except Exception:
+                    log.exception("harvest step failed")
+                continue                       # the client's rate limiter paces the loop
+            await asyncio.sleep(1)
