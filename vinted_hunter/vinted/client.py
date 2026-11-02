@@ -1,8 +1,9 @@
 """Async client for Vinted's public JSON API.
 
-Design goals: be a *polite* client. One shared session, a global minimum interval
-between requests, exponential backoff and a circuit breaker when Vinted pushes back
-(429/403). No proxy rotation or anti-bot evasion: if Vinted blocks, we slow down.
+Design goals: be a *polite* client - the IP it runs from is the owner's home connection, the same one
+they buy from. One shared session, a global minimum interval between requests, a hard hourly request
+cap, and on the FIRST 429/403 the client stops (no retry) and pauses 10 min, doubling on repeat blocks.
+No proxy rotation or anti-bot evasion: if Vinted pushes back, we slow down.
 """
 
 from __future__ import annotations
@@ -11,6 +12,7 @@ import asyncio
 import logging
 import random
 import time
+from collections import deque
 from typing import Any
 
 import httpx
@@ -33,7 +35,8 @@ class VintedUnavailable(RuntimeError):
 
 
 class VintedClient:
-    def __init__(self, domain: str = "www.vinted.fr", min_interval: float = 2.0, timeout: float = 20.0):
+    def __init__(self, domain: str = "www.vinted.fr", min_interval: float = 2.0, timeout: float = 20.0,
+                 max_per_hour: int = 360):
         self.domain = domain
         self.base = f"https://{domain}"
         self.min_interval = min_interval
@@ -44,6 +47,10 @@ class VintedClient:
         self._failures = 0
         self._open_until = 0.0
         self.requests_made = 0
+        self.max_per_hour = max_per_hour
+        self._window: deque[float] = deque()      # request timestamps of the last hour
+        self._strikes = 0                         # consecutive 429/403 blocks (decay after 6 h clean)
+        self._last_block = 0.0
 
     async def close(self) -> None:
         await self._http.aclose()
@@ -56,6 +63,17 @@ class VintedClient:
     def cooldown_remaining(self) -> int:
         return max(0, int(self._open_until - time.monotonic()))
 
+    @property
+    def requests_last_hour(self) -> int:
+        cutoff = time.monotonic() - 3600
+        while self._window and self._window[0] < cutoff:
+            self._window.popleft()
+        return len(self._window)
+
+    def has_budget(self, share: float = 1.0) -> bool:
+        """Background work (harvester) only runs below `share` of the hourly cap, so searches always have room."""
+        return not self.circuit_open and self.requests_last_hour < self.max_per_hour * share
+
     # ------------------------------------------------------------------ core
     async def _bootstrap(self) -> None:
         """Visiting the homepage gives the anonymous session cookie the API expects."""
@@ -67,10 +85,13 @@ class VintedClient:
 
     async def _throttle(self) -> None:
         async with self._lock:
+            if self.requests_last_hour >= self.max_per_hour:      # hourly cap reached: wait for a slot
+                await asyncio.sleep(self._window[0] + 3600 - time.monotonic() + 1)
             wait = self._last_request + self.min_interval * random.uniform(1.0, 1.4) - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)
             self._last_request = time.monotonic()
+            self._window.append(self._last_request)
             self.requests_made += 1
 
     async def _get(self, path: str, params: Any = None, *, as_json: bool = True, retries: int = 3) -> Any:
@@ -94,14 +115,26 @@ class VintedClient:
                 continue
             if resp.status_code == 404:
                 return None
-            if resp.status_code in (403, 429) or resp.status_code >= 500:
+            if resp.status_code in (403, 429):
+                # Rate-limited: stop at once. Retrying a 429 is exactly what gets an IP banned.
+                if time.monotonic() - self._last_block > 6 * 3600:
+                    self._strikes = 0
+                self._strikes += 1
+                self._last_block = time.monotonic()
+                pause = min(3600, 600 * 2 ** (self._strikes - 1))
+                self._open_until = time.monotonic() + pause
+                self._session_ready = False
+                log.warning("Vinted HTTP %s on %s: pausing all requests %ss (block #%s)",
+                            resp.status_code, path, pause, self._strikes)
+                raise VintedUnavailable(f"Vinted limite les requêtes, pause {pause // 60} min")
+            if resp.status_code >= 500:
                 self._failures += 1
                 backoff = min(600, 15 * 2 ** self._failures)
                 log.warning("Vinted HTTP %s on %s, backing off %ss", resp.status_code, path, backoff)
                 if self._failures >= 3:
                     self._open_until = time.monotonic() + backoff
                     self._session_ready = False
-                    raise VintedUnavailable(f"Vinted limite les requêtes, pause {backoff}s")
+                    raise VintedUnavailable(f"Vinted indisponible, pause {backoff}s")
                 await asyncio.sleep(min(backoff, 30))
                 continue
 

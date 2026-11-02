@@ -154,6 +154,15 @@ JSON:
 "questions": [{{"question": "...", "options": [{{"label": "...", "value": "..."}}]}}]}}"""
 
 
+def translate(listings: list[Listing]) -> str:
+    rows = [{"id": l.id, "title": l.title, "text": (l.description or "")[:500]} for l in listings]
+    return (
+        "Traduis ces annonces Vinted en français naturel (garde les noms de modèles, tailles et chiffres tels quels).\n"
+        f"{json.dumps(rows, ensure_ascii=False)}\n"
+        'Réponds UNIQUEMENT en JSON : {"items": [{"id": 123, "title": "...", "text": "..."}]}'
+    )
+
+
 def negotiation(deal: Deal) -> str:
     l = deal.listing
     target = deal.verdict.max_buy_price if deal.verdict and deal.verdict.max_buy_price else round(l.price * 0.85)

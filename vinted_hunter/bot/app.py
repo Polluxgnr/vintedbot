@@ -293,6 +293,7 @@ class HunterBot:
 
     # ================================================================ deals out
     async def send_deal(self, chat_id: int, deal: Deal, *, personal: bool = False) -> None:
+        deal = await self.hunter.localize(deal, await self._rs(chat_id))
         caption = v.deal_caption(deal, personal=personal)
         kb = v.deal_keyboard(deal)
         bot = self.app.bot

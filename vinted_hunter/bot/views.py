@@ -9,6 +9,7 @@ from telegram import InlineKeyboardButton as Btn
 from telegram import InlineKeyboardMarkup as Kb
 
 from ..config import RuntimeSettings
+from ..lang import NAMES as LANG_NAMES
 from ..models import Deal, Recommendation
 from ..niches import Niche
 
@@ -176,14 +177,19 @@ HELP_INTRO = ("ℹ️ <b>Comment le bot décide</b>\n\nChoisis un sujet. Sur cha
 def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> str:
     l, v, vr = d.listing, d.valuation, d.verdict
     head = "🔥" if d.pepite else "🔎"
-    title = vr.model_name if vr and vr.model_name else (l.model_name or l.title)
+    tr = l.translation or {}
+    shown_title = tr.get("title") or l.title
+    title = vr.model_name if vr and vr.model_name else (l.model_name or shown_title)
     insp = d.inspection
     lines = ["🔥🔥 <b>PÉPITE VÉRIFIÉE</b> 🔥🔥"] if d.pepite else []
     if insp and insp.scams:
         lines.insert(0, f"🚨 <b>ARNAQUE PROBABLE</b> : {e(insp.scams[0])}")
     lines.append(f"{head} <b>{e(title)}</b>")
-    if title != l.title:
-        lines.append(f"<i>{e(l.title[:80])}</i>")
+    if title != shown_title:
+        lines.append(f"<i>{e(shown_title[:80])}</i>")
+    if l.lang:
+        lines.append(f"🌍 Annonce en {LANG_NAMES.get(l.lang, l.lang)}"
+                     + (" — traduite" if tr else " — traduction IA indisponible, demande en anglais au vendeur"))
     lines.append(f"💶 <b>{l.price:.0f} €</b>  ·  coût total {d.landed_cost:.0f} €")
     if v.new_price:
         lines.append(f"🏷 Prix neuf ≈ {v.new_price:.0f} €  (−{max(0, 1 - l.price / v.new_price) * 100:.0f}%)")
@@ -249,9 +255,10 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
     for flag in d.flags:
         if flag in FLAG_LABELS:
             lines.append(FLAG_LABELS[flag])
-    if l.description:
-        excerpt = l.description[:160].replace("\n", " ")
-        lines.append(f"📝 <i>{e(excerpt)}{'…' if len(l.description) > 160 else ''}</i>")
+    desc = tr.get("text") or l.description
+    if desc:
+        excerpt = desc[:160].replace("\n", " ")
+        lines.append(f"📝 <i>{e(excerpt)}{'…' if len(desc) > 160 else ''}</i>")
     text = "\n".join(lines)
     if compact and len(text) > 1024:
         # Telegram captions are capped at 1024 chars: drop the description excerpt first, then truncate.

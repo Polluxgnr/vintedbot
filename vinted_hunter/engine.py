@@ -28,6 +28,7 @@ from .market import estimate, robust_center
 from .models import AIVerdict, Condition, Deal, Listing, MarketCheck, SearchSpec, WardrobeCheck
 from .niches import STOPWORDS, Niche, NicheCatalog, normalize, signature_key
 from .scoring import build_deal, gate_fails, is_alert_worthy, radar_worthy, reference_of, reject_reason
+from .lang import detect
 from .vinted.client import VintedClient, VintedUnavailable
 
 log = logging.getLogger(__name__)
@@ -392,6 +393,24 @@ class Hunter:
         await self.db.update_tracking(listing_id, status, price)
         return status, price
 
+    async def localize(self, deal: Deal, rs: RuntimeSettings) -> Deal:
+        """Cards read in French or English only: a foreign listing gets its language tagged and, when the AI
+        is reachable, a French translation of its title and description (stored, so it is paid once)."""
+        l = deal.listing
+        lang = detect(f"{l.title} {l.description or ''}")
+        if lang in (None, "fr", "en") or l.translation:
+            return deal
+        l = l.model_copy(update={"lang": lang})
+        if self.ai.enabled:
+            try:
+                tr = (await self.ai.translate([l], rs)).get(l.id)
+                if tr and (tr["title"] or tr["text"]):
+                    l = l.model_copy(update={"translation": tr})
+                    await self.db.upsert_listings([l])
+            except Exception as exc:
+                log.debug("translation of %s failed: %s", l.id, exc)
+        return deal.model_copy(update={"listing": l})
+
     async def check_wardrobe(self, deal: Deal, niche: Niche | None) -> WardrobeCheck | None:
         """Look at the seller's other listings before calling something a pépite.
 
@@ -751,7 +770,7 @@ class Hunter:
                         log.exception("watch %s failed", w["id"])
             except Exception:
                 log.exception("watch loop iteration failed")
-            if not ran_watch and not self._interactive and self.s.harvest:
+            if not ran_watch and not self._interactive and self.s.harvest                     and self.vinted.has_budget(self.s.harvest_share):
                 # Nothing due: spend the idle request budget growing the market database.
                 try:
                     await self.harvest_step()

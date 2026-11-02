@@ -138,3 +138,33 @@ def test_relists_collapse_to_one_card():
     c = make("Steam Deck OLED", 380, id=3, model_key="consoles:steam_deck_oled")
     deals = [SimpleNamespace(listing=l) for l in (a, b, c)]
     assert [d.listing.id for d in _dedupe_relists(deals)] == [1, 3]
+
+
+@pytest.mark.parametrize("text,lang", [
+    ("Steam deck OLED 512GB usata poco, alimentatore compatibile ma non UFFICIALE", "it"),
+    ("Condizioni ottime", "it"),
+    ("Console très bon état, vendue avec sa boîte", "fr"),
+    ("Maillot de foot Uhlsport gardien de but Coupe de la Ligue", "fr"),
+    ("Hermès Evelyne 16 schwarz Gold wie neu, mit Dustbag", "de"),
+    ("Great condition, never used, with box", "en"),
+    ("Intel NUC NUC7i3BNHXF 2.4GHz i3-7100U Mini PC", None),
+    ("Dell XPS 13 9310 in zeer goede staat", "nl"),
+])
+def test_language_detection(text, lang):
+    from vinted_hunter.lang import detect
+    assert detect(text) == lang
+
+
+def test_foreign_card_is_translated_or_flagged():
+    from vinted_hunter.bot.views import deal_caption
+    from vinted_hunter.scoring import build_deal
+    from vinted_hunter.models import Valuation
+    from vinted_hunter.config import RuntimeSettings
+    l = make("Steam deck OLED usata poco", 300, description="Condizioni ottime, usata poco", lang="it")
+    d = build_deal(l, Valuation(fair_value=450, low=400, high=500, confidence=0.8), None, RuntimeSettings())
+    cap = deal_caption(d)
+    assert "Annonce en l'italien" in cap and "indisponible" in cap
+    d2 = d.model_copy(update={"listing": l.model_copy(update={"translation": {"title": "Steam deck OLED peu utilisé",
+                                                                              "text": "Très bon état, peu utilisé"}})})
+    cap2 = deal_caption(d2)
+    assert "traduite" in cap2 and "Très bon état, peu utilisé" in cap2 and "Condizioni" not in cap2

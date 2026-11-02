@@ -115,7 +115,9 @@ class Listing(BaseModel):
     model_key: str | None = None
     model_name: str | None = None
     details_loaded: bool = False
-    scam_hint: str | None = None       # set by cross-listing checks (e.g. a network of identical listings)
+    scam_hint: str | None = None
+    lang: str | None = None             # detected language of a foreign listing (it, es, de...)
+    translation: dict[str, str] | None = None   # {"title", "text"} in French, for foreign listings       # set by cross-listing checks (e.g. a network of identical listings)
 
     @property
     def age_minutes(self) -> float | None:

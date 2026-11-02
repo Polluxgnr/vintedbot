@@ -132,6 +132,20 @@ class AICascade:
                                       tier=1, max_tokens=1000)
         return res.data if isinstance(res.data, dict) else {}
 
+    async def translate(self, listings: list[Listing], rs: RuntimeSettings) -> dict[int, dict[str, str]]:
+        """French translation of foreign listings (title + description excerpt), one cheap call per batch."""
+        await self.llm.ensure_budget(rs.ai_daily_budget_usd)
+        res = await self.llm.complete(self.s.model_triage, prompts.SYSTEM_EXPERT, prompts.translate(listings),
+                                      tier=1, max_tokens=350 * len(listings) + 200)
+        items = (res.data or {}).get("items", []) if isinstance(res.data, dict) else []
+        out: dict[int, dict[str, str]] = {}
+        for row in items:
+            try:
+                out[int(row["id"])] = {"title": str(row.get("title") or ""), "text": str(row.get("text") or "")}
+            except (KeyError, TypeError, ValueError):
+                continue
+        return out
+
     async def negotiation(self, deal: Deal, rs: RuntimeSettings) -> dict:
         await self.llm.ensure_budget(rs.ai_daily_budget_usd)
         res = await self.llm.complete(self.s.model_triage, prompts.SYSTEM_EXPERT, prompts.negotiation(deal),

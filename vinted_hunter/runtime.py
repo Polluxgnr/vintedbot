@@ -72,7 +72,8 @@ async def build_services(settings: Settings | None = None) -> Services:
     niches = NicheCatalog.load(s.niches_file)   # fail fast on a broken YAML, before opening resources
     db = Database(s.db_path)
     await db.connect()
-    vinted = VintedClient(s.vinted_domain, s.vinted_min_request_interval, s.vinted_timeout)
+    vinted = VintedClient(s.vinted_domain, s.vinted_min_request_interval, s.vinted_timeout,
+                          s.vinted_max_requests_per_hour)
     llm = LLM(s.openrouter_api_key, fallbacks=s.fallback_models, spend_today=db.ai_spend_today,
               record_usage=db.record_ai_usage)
     hunter = Hunter(s, db, vinted, AICascade(llm, s), niches)

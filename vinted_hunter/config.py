@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     vinted_domain: str = "www.vinted.fr"
     vinted_min_request_interval: float = 3.0   # seconds between requests (politeness)
     vinted_timeout: float = 30.0
+    vinted_max_requests_per_hour: int = 360    # hard cap: the bot runs on the home IP you also buy from
+    harvest_share: float = 0.5                 # the harvester only crawls below this share of the cap
 
     # --- Storage -------------------------------------------------------------
     # Kept outside the project on purpose: a live SQLite file inside a synced

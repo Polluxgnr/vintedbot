@@ -82,3 +82,25 @@ async def test_llm_circuit_breaker_fails_fast():
         await llm.complete("m", "s", "u", tier=2)
     assert first == 2 and calls["n"] == 2          # second call fails instantly, no network attempt
     await llm.close()
+
+
+async def test_vinted_stops_on_first_429_and_caps_hourly():
+    import httpx
+    from vinted_hunter.vinted.client import VintedClient, VintedUnavailable
+
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        return httpx.Response(200 if request.url.path == "/" else 429, text="")
+
+    c = VintedClient("www.vinted.fr", min_interval=0, max_per_hour=5)
+    c._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    with pytest.raises(VintedUnavailable, match="10 min"):
+        await c._get("/items/1", as_json=False)
+    assert calls["n"] == 2 and c.circuit_open          # bootstrap + one 429, no retry
+    with pytest.raises(VintedUnavailable):
+        await c._get("/items/2", as_json=False)
+    assert calls["n"] == 2                             # paused: no network at all
+    assert c.requests_last_hour == 2 and c.has_budget(1.0) is False   # circuit open => no background budget
+    await c.close()
