@@ -6,8 +6,8 @@ $task = Get-ScheduledTask -TaskName "VintedHunter"
 
 if ($task) {
     Stop-ScheduledTask -TaskName "VintedHunter"
-    Get-CimInstance Win32_Process -Filter "Name='pythonw.exe'" |
-        Where-Object { $_.CommandLine -like "*vinted_hunter*" } |
+    Get-CimInstance Win32_Process |
+        Where-Object { $_.Name -like "python*" -and $_.CommandLine -like "*vinted_hunter*" } |
         ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
     Start-Sleep -Seconds 2
     Start-ScheduledTask -TaskName "VintedHunter"
@@ -16,9 +16,9 @@ if ($task) {
     Start-Process -FilePath "pythonw.exe" -ArgumentList "-m", "vinted_hunter" -WorkingDirectory $root -WindowStyle Hidden
 }
 
-Start-Sleep -Seconds 4
+Start-Sleep -Seconds 12
 $log = Join-Path $env:USERPROFILE ".vinted_hunter\bot.log"
-$ok = (Test-Path $log) -and ((Get-Item $log).LastWriteTime -gt (Get-Date).AddSeconds(-30))
+$ok = (Test-Path $log) -and ((Get-Item $log).LastWriteTime -gt (Get-Date).AddSeconds(-40))
 Add-Type -AssemblyName System.Windows.Forms
 if ($ok) {
     Start-Process "https://t.me/vinted_hunter_dealz_bot"
