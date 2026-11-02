@@ -6,10 +6,33 @@ Finds mispriced Vinted listings, checks them with AI (text + photos) and against
 
 > The previous project in this repository (VF Finder, a multi-platform finder) is kept on the [`vf-finder`](https://github.com/Polluxgnr/vintedbot/tree/vf-finder) branch.
 
+## Démarrage rapide (Windows)
+
+1. **Une seule fois :** double-clique `installer_demarrage_auto.bat` (le bot démarre seul à chaque ouverture de session), puis lance `scripts\creer_raccourcis.ps1` (clic droit → *Exécuter avec PowerShell*). Deux raccourcis apparaissent sur le bureau.
+2. **Quand tu arrives sur ton PC :** rien à faire, le bot tourne déjà. Pour le (re)lancer à la main, double-clique **Vinted Hunter** sur le bureau : il redémarre le bot en arrière-plan et ouvre Telegram sur le bot.
+3. **Pour l'arrêter :** double-clique **Arrêter Vinted Hunter**.
+4. **Si rien ne vient :** le journal est dans `%USERPROFILE%\.vinted_hunter\bot.log`. Le raccourci l'ouvre tout seul si le démarrage échoue.
+
+Le PC doit rester allumé (Paramètres → Système → Alimentation → Veille : Jamais).
+
+## Recherches précises et alertes perso
+
+Écris ce que tu veux en une phrase, le bot en tire des filtres stricts, même sans IA :
+
+| Tu écris | Le bot filtre |
+|---|---|
+| *tee carhartt moins de 10 € en super bon état avec un logo graphique* | t-shirt Carhartt · ≤ 10 € · neuf/très bon état · l'annonce doit parler de logo/print |
+| *pack chaussettes boss neuf taille M unicolore pour moi* | pack/lot · neuf · taille M · exclut rayé/motif/camo · mode **perso** |
+| *alerte moi pour un rolex submariner sous 5000 €* | alerte permanente créée directement |
+
+- **Mode perso** (« pour moi », « for me ») : tu reçois chaque annonce qui colle aux critères et au budget, d'un vendeur sûr, même sans marge de revente.
+- **Mode revente** (par défaut) : seulement les vraies pépites.
+- Après chaque recherche, **👁 M'alerter sur cette recherche** la transforme en alerte.
+
 ## What it scans
 
 - **Where:** vinted.fr (configurable with `VINTED_DOMAIN`). It reads the same server-rendered search and item pages a browser gets, because Vinted retired its public catalog JSON endpoint.
-- **What:** 18 niches with about 200 reference models (`config/niches.yaml`). Each niche has 8–18 search queries that rotate, newest listings first, about 46 listings per page.
+- **What:** 19 niches with about 290 reference models (`config/niches.yaml`). Each niche has 8–18 search queries that rotate, newest listings first, about 46 listings per page.
 - **How much:** about 5,000 listings per hour in the first live runs, with 3 s between requests. Productive niches are polled more often (adaptive scheduling) and idle ones less.
 - **What it keeps:** every listing is stored as a price observation (the market memory), and listings matched to a catalog model enter the sales database.
 
@@ -37,7 +60,7 @@ An alert fires only when **every** check passes:
 - **Description read.** Missing parts and defects are deducted from the value.
 - **Price ≥ 35 % under the estimate,** but not under 30 % of it (that usually means a different product or a scam).
 - **Money:** profit ≥ 30 € (or the niche minimum) and margin ≥ 40 %.
-- **Confidence:** price-estimate confidence ≥ 60 % and score ≥ 70.
+- **Confidence:** price-estimate confidence ≥ 60 % and score ≥ 55.
 - **Seller** not 🔴, and no scam signals.
 - **Live market check:** the bot searches the exact model on Vinted right then and compares against at least 5 identical listings, with prices normalized to the same condition. At most 1 may be cheaper, and the price must be ≥ 25 % under their median.
 - **Fake-prone niches** (luxury, watches, Apple, smartphones): the AI photo check is mandatory.
@@ -84,7 +107,11 @@ Every good deal seen is stored, not only the pépites. Requirements: an identifi
 | 💎 Luxury | LV, Hermès, Chanel, Dior, Goyard, Celine, Prada, Gucci |
 | 🎮 Consoles · 👾 Retro gaming · ⚡ Pokémon/TCG · 🧱 LEGO | |
 | 👟 Sneakers · 🏔️ Outdoor · 🧥 Streetwear · ⚽ Football shirts | |
-| 📷 Film cameras · 📸 Digital cameras · 🎧 Audio · ⌚ Watches · 🏠 Home premium | |
+| 📷 Film cameras · 📸 Digital cameras · ⌚ Watches · 🏠 Home premium | |
+| 🎧 Audio & speakers | Sony XM4/XM5, Bose, AirPods Max, Sonos Era/Five/Move/Arc, Marshall Stanmore/Woburn, B&O, JBL Boombox/PartyBox, Devialet, KEF |
+| 📽 Projectors | Epson EH-TW, BenQ W2700/TK850, XGIMI Halo/Horizon/MoGo, Samsung Freestyle, Nebula, Dangbei |
+
+Every card shows **🔎 Avant d'acheter**: the 2–3 checks that prove this kind of item is genuine and working (serial number, IMEI, shutter count, projected image…).
 
 Resale prices are seeds; live comparables and real sales take over as data accumulates. Edit the YAML freely.
 
@@ -136,6 +163,7 @@ python -m vinted_hunter analyze https://www.vinted.fr/items/123
 
 ## Notes
 
-- **Polite client:** 3 s between requests, backoff, and a circuit breaker on 429. No proxy rotation or anti-bot evasion.
+- **Your home IP is protected:** the bot runs on the same connection you buy from, so a Vinted ban would hurt. It waits 3–4 s between requests and makes at most **360 requests per hour** (`VINTED_MAX_REQUESTS_PER_HOUR` in `.env`). The harvester only uses half of that, so searches always have room. On the **first** 429/403 it stops everything for 10 min, doubling up to 1 h if blocks repeat. No proxy rotation or anti-bot evasion. Raising the cap means more data, at your own risk; 360–500 is the sensible range.
+- **Languages:** vinted.fr shows listings from all over Europe. Foreign listings are translated into French, by the AI or, when OpenRouter is unreachable, by the free MyMemory API. Defects are read in FR/EN/IT/ES/DE/NL/PT (« non si accende », « defekt », « for parts »…), and a broken or « sold as is » item is never a pépite.
 - **Database location:** `%USERPROFILE%\.vinted_hunter`, outside any synced folder.
 - **Tests:** `pip install -r requirements-dev.txt && python -m pytest`.

@@ -9,6 +9,7 @@ from __future__ import annotations
 import math
 
 from .config import RuntimeSettings
+from .criteria import mismatch
 from .inspection import apply_inspection, assess_seller, inspect_listing
 from .models import AIVerdict, Deal, Finding, Inspection, Listing, Recommendation, SearchSpec, SellerCheck, Valuation
 from .niches import Niche, normalize
@@ -36,7 +37,7 @@ def reject_reason(listing: Listing, niche: Niche | None, spec: SearchSpec | None
             return "taille différente"
     if listing.seller.on_holiday:
         return "vendeur en vacances"
-    return None
+    return mismatch(listing, spec)
 
 
 def landed_cost(listing: Listing, niche: Niche | None, rs: RuntimeSettings) -> float:
@@ -193,6 +194,11 @@ def gate_fails(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: Searc
         fails.append("modèle pas identifié précisément")
     if not l.details_loaded:
         fails.append("description pas encore lue")
+    major = [f.label for f in (deal.inspection.defects if deal.inspection else [])
+             if f.impact >= 0.3 or f.label.startswith("vendu en l'état")]
+    if major and not (spec and spec.goal == "personal"):
+        # A broken / locked / "sold as is" item is a repair gamble, never a pépite.
+        fails.append(f"défaut majeur : {major[0]}")
     if not v.fair_value:
         return fails + ["cote inconnue"]
     discount = (1 - l.price / v.fair_value) * 100
@@ -253,6 +259,15 @@ def radar_worthy(deal: Deal) -> bool:
 
 
 def is_alert_worthy(deal: Deal, rs: RuntimeSettings, niche: Niche | None, spec: SearchSpec | None = None) -> bool:
+    if spec and spec.goal == "personal":
+        # Shopping for yourself: every listing that fits the criteria and the budget, from a safe seller.
+        if mismatch(deal.listing, spec) or (deal.inspection and deal.inspection.scams):
+            return False
+        if deal.seller_check and deal.seller_check.level == "risque":
+            return False
+        if deal.verdict and not deal.verdict.relevant:
+            return False
+        return deal.valuation.fair_value is None or deal.listing.price <= deal.valuation.fair_value * 1.1
     if rs.alert_mode == "pepites":
         return not gate_fails(deal, niche, rs, spec)
     min_profit = (spec and spec.min_profit) or (niche and niche.min_profit) or rs.min_profit_eur

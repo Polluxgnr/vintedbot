@@ -109,6 +109,7 @@ class Niche(BaseModel):
     allow: list[str] = Field(default_factory=list)  # global excludes this niche wants to keep (e.g. "hs" for repairers)
     red_flags: list[str] = Field(default_factory=list)
     vision_checklist: list[str] = Field(default_factory=list)
+    authenticity: list[str] = Field(default_factory=list)  # how to check it's genuine (shown on every card)
     ai_hints: str = ""
     models: list[RefModel] = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
@@ -152,8 +153,9 @@ class Niche(BaseModel):
         if any(re.search(g, text) for g in self.model_guard):
             return None   # a game, a controller, a card, a kids' item... not the reference product
         hits = [m for m in self.models if m.matches(text)]
-        # Longest pattern wins: "airpods pro 2" beats "airpods pro"
-        return max(hits, key=lambda m: max(len(p) for p in m.match)) if hits else None
+        # A precise model beats a generic family ("Stanmore III" beats "Enceinte Marshall"),
+        # then the longest pattern wins: "airpods pro 2" beats "airpods pro"
+        return max(hits, key=lambda m: (not m.generic, max(len(p) for p in m.match))) if hits else None
 
     @cached_property
     def search_queries(self) -> list[str]:

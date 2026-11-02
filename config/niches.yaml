@@ -423,7 +423,8 @@ niches:
     emoji: "🎧"
     description: "Casques premium, iPod, platines vinyle, enceintes Marshall."
     queries: [sony wh-1000xm5, sony wh-1000xm4, bose quietcomfort, ipod classic, ipod nano, technics sl-1200, platine vinyle,
-              marshall enceinte, bang olufsen, sonos]
+              marshall enceinte, bang olufsen, sonos, sonos era, sonos move, marshall stanmore, marshall woburn, enceinte bose,
+              jbl boombox, jbl partybox, beosound, devialet, enceinte bluetooth, barre de son sonos]
     price_max: 900
     shipping_eur: 6
     min_profit: 25
@@ -451,6 +452,69 @@ niches:
       - {key: garmin_fenix, name: Garmin Fenix 6/7/8, match: ['fenix ?[678]'], resale: 330}
       - {key: garmin_fr, name: Garmin Forerunner 255/265/955/965, match: ['forerunner ?(?:255|265|955|965)'], resale: 230}
       - {key: galaxy_buds, name: Galaxy Buds 2 Pro / 3 Pro, match: ['galaxy buds ?(?:2 pro|3 pro)'], resale: 100}
+      # Good speakers: liquid market, low fake risk, big gap between panic sellers and the real price.
+      - {key: sonos_era100, name: Sonos Era 100, match: ['sonos era ?100'], resale: 150, new: 279}
+      - {key: sonos_era300, name: Sonos Era 300, match: ['sonos era ?300'], resale: 280, new: 499}
+      - {key: sonos_five, name: Sonos Five, match: ['sonos (?:play ?)?five|sonos play ?5'], resale: 330, new: 599}
+      - {key: sonos_move, name: Sonos Move / Move 2, match: ['sonos move'], resale: 260, new: 449}
+      - {key: sonos_arc, name: Sonos Arc / Arc Ultra, match: ['sonos arc'], resale: 520, new: 999}
+      - {key: sonos_beam, name: Sonos Beam, match: ['sonos beam'], resale: 250, new: 499}
+      - {key: stanmore3, name: Marshall Stanmore III, match: ['stanmore ?(?:iii|3)'], resale: 220, new: 379}
+      - {key: acton3, name: Marshall Acton III, match: ['acton ?(?:iii|3)'], resale: 150, new: 279}
+      - {key: woburn3, name: Marshall Woburn III, match: ['woburn ?(?:iii|3)'], resale: 320, new: 579}
+      - {key: emberton, name: Marshall Emberton II/III, match: ['emberton'], resale: 90, new: 169}
+      - {key: bo_a1, name: B&O Beosound A1, match: ['beosound a1|beoplay a1'], resale: 130, new: 279}
+      - {key: bo_a9, name: B&O Beoplay A9 / Beosound A9, match: ['beo(?:play|sound) a9'], resale: 900, new: 3000}
+      - {key: bo_h95, name: B&O Beoplay H95/HX, match: ['beoplay h(?:95|x)\b'], resale: 250, new: 499}
+      - {key: bose_slmax, name: Bose SoundLink Max, match: ['soundlink max'], resale: 220, new: 399}
+      - {key: bose_slflex, name: Bose SoundLink Flex, match: ['soundlink flex'], resale: 85, new: 169}
+      - {key: jbl_boombox, name: JBL Boombox 2/3, match: ['jbl boombox'], resale: 260, new: 499}
+      - {key: jbl_xtreme, name: JBL Xtreme 3/4, match: ['jbl xtreme ?[34]'], resale: 170, new: 349}
+      - {key: jbl_partybox, name: JBL PartyBox, match: ['partybox'], resale: 220, generic: true}
+      - {key: ue_megaboom, name: UE Megaboom 3/4, match: ['megaboom'], resale: 90, new: 199}
+      - {key: devialet, name: Devialet Phantom, match: ['devialet'], resale: 900, generic: true}
+      - {key: kef_lsx, name: KEF LSX / LS50 Wireless, match: ['kef ls(?:x|50)'], resale: 600, generic: true}
+
+  projectors:
+    vinted_verification: electronics
+    verification_min_price: 50
+    name: "Vidéoprojecteurs"
+    emoji: "📽"
+    description: "Epson, BenQ, XGIMI, Nebula, Samsung Freestyle - vendus vite et souvent bradés après un déménagement."
+    enabled_by_default: true
+    queries: [videoprojecteur, projecteur 4k, epson eh-tw, benq w2700, benq tk, xgimi halo, xgimi horizon, xgimi mogo,
+              samsung freestyle, nebula capsule, nebula mars, optoma uhd, videoprojecteur portable, dangbei]
+    price_min: 40
+    price_max: 2500
+    shipping_eur: 9
+    min_profit: 40
+    authenticity_risk: low
+    collectible: false
+    required_specs: []
+    model_guard:
+      - '\b(?:ecran de projection|toile|ecran seul|support plafond|telecommande seule|lampe seule|ampoule|lampe de rechange|sacoche|housse|mini projecteur led|star projector|projecteur etoile|galaxy projector|projecteur de ciel|veilleuse)\b'
+    components: [{name: télécommande, match: 'telecommande|remote', share: 0.05}, {name: alimentation, match: 'alimentation|chargeur|cable', share: 0.05}, {name: boîte, match: 'boite', share: 0.03}]
+    alone: []
+    exclude: ['\becran de projection\b', '\btoile\b', '\bprojecteur etoile\w*', '\bstar projector\b', '\bveilleuse\b', '\blampe seule\b']
+    red_flags: ["heures de lampe non précisées", "4K sur un projecteur à 60 € (faux 4K)", "image jaune ou taches = panneau LCD/DMD mort", "ventilateur bruyant"]
+    vision_checklist: ["photo de l'image projetée", "compteur d'heures de lampe", "objectif rayé", "télécommande"]
+    authenticity: ["photo/vidéo de l'image projetée allumée", "heures de lampe (menu info)", "méfiance si 4K à très bas prix (faux 4K)"]
+    models:
+      - {key: epson_tw7000, name: Epson EH-TW7000/7100, match: ['tw ?7[01]00'], resale: 750, new: 1499}
+      - {key: epson_tw6, name: Epson EH-TW6xx/5xxx, match: ['tw ?(?:6[0-9]{2}|5[0-9]{3})\b'], resale: 300, new: 699}
+      - {key: epson_ls, name: Epson EH-LS laser, match: ['eh ?ls ?\d{3,5}'], resale: 1100, generic: true}
+      - {key: benq_w2700, name: BenQ W2700/W2710, match: ['w ?27[01]0'], resale: 800, new: 1599}
+      - {key: benq_w1800, name: BenQ W1800/TK700, match: ['w ?1800|tk ?700'], resale: 500, new: 999}
+      - {key: benq_tk850, name: BenQ TK850/TK860, match: ['tk ?8[56]0'], resale: 650, new: 1299}
+      - {key: xgimi_halo, name: XGIMI Halo / Halo+, match: ['xgimi halo'], resale: 330, new: 699}
+      - {key: xgimi_horizon, name: XGIMI Horizon (Pro/Ultra/S), match: ['xgimi horizon'], resale: 650, new: 1299}
+      - {key: xgimi_mogo, name: XGIMI MoGo 2 / MoGo 3, match: ['xgimi mogo|mogo ?[23]'], resale: 230, new: 449}
+      - {key: freestyle, name: Samsung The Freestyle, match: ['freestyle'], exclude: ['velo', 'bmx', 'ski'], resale: 330, new: 599}
+      - {key: nebula_capsule, name: Anker Nebula Capsule, match: ['nebula capsule|capsule (?:3|ii|2|air)'], resale: 220, new: 449}
+      - {key: nebula_mars, name: Anker Nebula Mars, match: ['nebula mars'], resale: 330, new: 699}
+      - {key: optoma_uhd, name: Optoma UHD 4K, match: ['optoma uhd'], resale: 650, generic: true}
+      - {key: dangbei_atom, name: Dangbei Atom / Mars Pro, match: ['dangbei (?:atom|mars)'], resale: 600, new: 1199}
+      - {key: lg_cinebeam, name: LG CineBeam, match: ['cinebeam'], resale: 450, generic: true}
 
   watches:
     vinted_verification: authenticity

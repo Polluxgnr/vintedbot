@@ -24,11 +24,14 @@ from .ai.cascade import AICascade
 from .ai.llm import BudgetExceeded
 from .config import RuntimeSettings, Settings
 from .db import Database
+from .criteria import mismatch
+from .inspection import inspect_listing
 from .market import estimate, robust_center
 from .models import AIVerdict, Condition, Deal, Listing, MarketCheck, SearchSpec, WardrobeCheck
 from .niches import STOPWORDS, Niche, NicheCatalog, normalize, signature_key
 from .scoring import build_deal, gate_fails, is_alert_worthy, radar_worthy, reference_of, reject_reason
 from .lang import detect
+from .translate import FreeTranslator
 from .vinted.client import VintedClient, VintedUnavailable
 
 log = logging.getLogger(__name__)
@@ -50,6 +53,7 @@ class Hunter:
         self.db = db
         self.vinted = vinted
         self.ai = ai
+        self.translator = FreeTranslator()
         self.niches = niches
         self._query_cursor: dict[int, int] = defaultdict(int)
         self._last_run: dict[int, float] = {}
@@ -272,10 +276,12 @@ class Hunter:
             enriched = [l.model_copy(update={"scam_hint": rings[l.id]}) if l.id in rings else l for l in enriched]
             tier1 = [d.model_copy(update={"listing": d.listing.model_copy(update={"scam_hint": rings[d.listing.id]})})
                      if d.listing.id in rings else d for d in tier1]
+        enriched = [await self._translated(l, rs) for l in enriched]
         seen = {l.id for l in enriched}
         final = [await self._value(l, niche, rs, spec, verdicts.get(l.id), pool) for l in enriched]
         if not analysed_only:
             final += [d for d in tier1 if d.listing.id not in seen]
+        final = [d for d in final if not mismatch(d.listing, spec)]   # precise criteria, now with descriptions
         return sorted(final, key=lambda d: d.score, reverse=True)
 
     async def _date_listings(self, listings: list[Listing]) -> None:
@@ -393,23 +399,35 @@ class Hunter:
         await self.db.update_tracking(listing_id, status, price)
         return status, price
 
-    async def localize(self, deal: Deal, rs: RuntimeSettings) -> Deal:
-        """Cards read in French or English only: a foreign listing gets its language tagged and, when the AI
-        is reachable, a French translation of its title and description (stored, so it is paid once)."""
-        l = deal.listing
+    async def _translated(self, l: Listing, rs: RuntimeSettings) -> Listing:
+        """Foreign listing (Italy, Spain, Germany...): tag its language and attach a French translation, so the
+        card is readable AND defect detection reads it ("non si accende" = broken). AI first, free API fallback."""
+        if l.translation:
+            return l
         lang = detect(f"{l.title} {l.description or ''}")
-        if lang in (None, "fr", "en") or l.translation:
-            return deal
+        if lang in (None, "fr", "en"):
+            return l
         l = l.model_copy(update={"lang": lang})
+        tr = None
         if self.ai.enabled:
             try:
                 tr = (await self.ai.translate([l], rs)).get(l.id)
-                if tr and (tr["title"] or tr["text"]):
-                    l = l.model_copy(update={"translation": tr})
-                    await self.db.upsert_listings([l])
             except Exception as exc:
-                log.debug("translation of %s failed: %s", l.id, exc)
-        return deal.model_copy(update={"listing": l})
+                log.debug("AI translation of %s failed: %s", l.id, exc)
+        if not (tr and (tr["title"] or tr["text"])):
+            tr = await self.translator.translate(l.title, l.description or "", lang)
+        if tr:
+            l = l.model_copy(update={"translation": tr})
+            await self.db.upsert_listings([l])
+        return l
+
+    async def localize(self, deal: Deal, rs: RuntimeSettings) -> Deal:
+        """Cards read in French or English only (translation stored, so it is paid once)."""
+        l = await self._translated(deal.listing, rs)
+        if l is deal.listing:
+            return deal
+        insp = inspect_listing(l, self.niches.get(l.niche_id) if l.niche_id else None) if l.translation else deal.inspection
+        return deal.model_copy(update={"listing": l, "inspection": insp})
 
     async def check_wardrobe(self, deal: Deal, niche: Niche | None) -> WardrobeCheck | None:
         """Look at the seller's other listings before calling something a pépite.

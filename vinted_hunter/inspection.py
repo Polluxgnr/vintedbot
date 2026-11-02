@@ -23,7 +23,8 @@ _NEG = r"(?:sans|pas d[e]?|pas les?|pas la|pas l|aucune?|manque(?:nt)?|manquante
 _STOP = r"(?!avec\b|et\b|mais\b|plus\b|inclus\w*\b|fourni\w*\b)"
 _POST = (r"(?:(?:non|pas|jamais) (?:inclus\w*|fourni\w*|vendu\w*|compris\w*|livre\w*|present\w*|dispo\w*)"
          r"|absente?s?|manquante?s?|perdue?s?|a part|en option|vendue?s? separement|pas avec)")
-_NEG_BEFORE = re.compile(r"\b(?:sans|pas|aucune?|ni|jamais|zero|0|non|nul(?:le)?)\b(?: \w+){0,2}$")
+_NEG_BEFORE = re.compile(r"\b(?:sans|pas|aucune?|ni|jamais|zero|0|non|nul(?:le)?|never|no|without|niemals|keine?n?|"
+                         r"nooit|geen|nunca|sin|mai|senza|nessun[oa]?|ohne|zonder|sem)\b(?: \w+){0,2}$")
 
 # (group, regex, label, value impact)
 DEFECTS = [
@@ -45,6 +46,29 @@ DEFECTS = [
     ("pilling", r"bouloch\w*", "boulochage", 0.04),
     ("wear", r"traces? d usure|\busure\b|\busee?s?\b", "usure", 0.04),
     ("yellow", r"jaunis?\w*", "jaunissement", 0.05),
+    # vinted.fr shows listings from all of Europe: the deal-killers must be read in every language.
+    ("broken", r"(?:does ?n ?t|doesnt|won ?t|will not|wont|can ?t|not) (?:turn(?:ing)? on|power(?:ing)? on|work|charg|boot|"
+               r"start|read|switch on)\w*|not working|stopped working|\bbroken\b|\bfaulty\b|for parts|spares? (?:or|and|/) "
+               r"repairs?|\bdead\b|no power", "ne fonctionne pas", 0.6),
+    ("broken", r"non (?:si )?(?:accende|funziona|carica|parte|legge|avvia)|\bguast\w*|\brott[oaie]\b|per (?:ricambi|pezzi)|"
+               r"da riparare|difettos\w*|non funzionante", "ne fonctionne pas", 0.6),
+    ("broken", r"no (?:se )?(?:enciende|funciona|carga|arranca|lee)|averiad\w*|\brot[oa]s?\b|para (?:piezas|reparar|"
+               r"repuestos)|estropead\w*", "ne fonctionne pas", 0.6),
+    ("broken", r"(?:geht|startet|funktioniert|ladt|laedt|lauft|laeuft) nicht|\bdefekt\w*|\bkaputt\w*|fur bastler|"
+               r"fuer bastler|als ersatzteil", "ne fonctionne pas", 0.6),
+    ("broken", r"(?:werkt|start|gaat|laadt) niet|\bkapot\b|\bdefect\b|voor onderdelen", "ne fonctionne pas", 0.6),
+    ("broken", r"nao (?:liga|funciona|carrega)|avariad\w*|para pecas|\bestragad\w*", "ne fonctionne pas", 0.6),
+    ("asis", r"vendu\w* en l etat|dans l etat|tel quel|sold as ?is|\bas is\b|cosi com e|venduta? cosi|tal cual|"
+             r"como esta|wie gesehen|zoals gezien", "vendu en l'état (souvent un défaut)", 0.2),
+    ("battery", r"battery (?:\w+ ){0,2}(?:drain\w*|issue|problem|dead|weak|swollen|bad)|drains? (?:the )?batter\w*|"
+                r"batteria (?:\w+ )?(?:scarica|gonfia|da cambiare)|bateria (?:\w+ )?(?:mal|hinchada)|akku (?:\w+ )?"
+                r"(?:schwach|defekt|kaputt)", "batterie défaillante", 0.2),
+    ("issue", r"\b(?:issue|problem|probleme|problema|probleem|defaut|defect|fehler)s?\b", "problème signalé", 0.1),
+    ("readme", r"\bread\b(?: the)? desc\w*|\bread$|leggi (?:la )?descrizione|lire (?:la )?desc\w*|lee (?:la )?descripcion|"
+               r"beschreibung lesen", "« lire la description » (défaut caché ?)", 0.05),
+    ("screen", r"(?:cracked|broken|smashed) (?:screen|display|glass)|(?:screen|display) (?:cracked|broken)|"
+               r"schermo (?:rotto|crepato)|pantalla (?:rota|rajada)|display (?:kaputt|gebrochen)", "écran fissuré", 0.35),
+    ("lock", r"icloud lock\w*|activation lock|bloccato icloud|bloqueado icloud|gesperrt", "verrouillage compte", 0.8),
 ]
 POSITIVES = [
     (r"facture|ticket de caisse|preuve d achat", "facture"),
@@ -62,6 +86,45 @@ SCAMS = [
     (r"paiement(?: \w+){0,2} (?:hors|en dehors|direct)|virement|paypal|lydia|wero|paylib|western union", "paiement hors Vinted"),
     (r"\b0[67](?: ?\d{2}){4}\b|mon (?:numero|num|tel)\b", "numéro de téléphone"),
 ]
+
+# What to ask / look at before paying, per niche (a niche's own `authenticity:` list in YAML wins).
+AUTH_CHECKS: dict[str, list[str]] = {
+    "sneakers": ["photo de l'étiquette intérieure (code style = celui de la boîte)", "coutures et logo en gros plan",
+                 "prends la vérification d'authenticité Vinted si > 100 €"],
+    "luxury": ["numéro de série / date code en photo", "facture ou certificat (Entrupy, boutique)",
+               "vérification d'authenticité Vinted obligatoire, jamais de paiement hors Vinted"],
+    "watches": ["numéro de série et calibre (photo du fond / mouvement)", "papiers + boîte, facture d'achat",
+                "vérification d'authenticité Vinted ; méfiance prix < 50 % de la cote"],
+    "apple_tech": ["numéro de série à vérifier sur checkcoverage.apple.com", "photo Réglages > Général > Informations",
+                   "iCloud/Localiser désactivé avant envoi"],
+    "smartphones": ["IMEI (taper *#06#) à vérifier : non blacklisté", "photo de la santé batterie et du stockage",
+                    "compte Google/iCloud retiré, pas de blocage opérateur"],
+    "consoles": ["vidéo de la console allumée (menu Paramètres > infos)", "numéro de série = celui de la boîte",
+                 "pas de console bannie : demander une photo du réseau en ligne"],
+    "retro_gaming": ["photo du circuit / cartouche ouverte (repro = puce unique)", "étiquette et plastique d'origine",
+                     "jeu testé en vidéo"],
+    "pokemon_tcg": ["photo recto/verso nette + test de lumière", "carte gradée : vérifier le numéro sur le site PSA/CGC",
+                    "booster/display : film d'origine intact (pas de reseal)"],
+    "lego": ["numéro du set et notice", "boîte scellée : rubans d'origine", "pièces 100 % LEGO (pas de compatible)"],
+    "film_cameras": ["obturateur testé à toutes les vitesses (vidéo)", "optique à la lampe : champignons, buée",
+                     "posemètre et joints de lumière"],
+    "digital_cameras": ["nombre de déclenchements (shutter count)", "numéro de série lisible", "capteur sans taches"],
+    "audio": ["vidéo de l'appareil en marche (son)", "numéro de série dans l'appli de la marque",
+              "casque Sony/Bose/AirPods neuf très bas = contrefaçon"],
+    "streetwear_designer": ["étiquettes intérieures et de lavage en photo", "comparer au legit-check de la marque",
+                            "vérification d'authenticité Vinted"],
+    "outdoor_premium": ["étiquette intérieure avec code produit", "logo brodé net, zip de la marque (YKK/Riri)",
+                        "vérification d'authenticité Vinted"],
+    "football_shirts": ["étiquette intérieure : code produit = modèle/saison", "flocage et badges de qualité",
+                        "méfiance « réplique », « version fan »"],
+    "pc_hardware": ["capture GPU-Z / CPU-Z ou vidéo en charge", "numéro de série et facture (garantie)",
+                    "pas de carte de minage sans le dire"],
+    "mini_pc_homelab": ["capture des specs (CPU, RAM, SSD) depuis le système", "vidéo de démarrage",
+                        "chargeur d'origine inclus"],
+    "home_premium": ["vidéo de l'appareil en marche", "numéro de série / facture", "pièces et accessoires listés"],
+    "projectors": ["photo/vidéo de l'image projetée allumée", "heures de lampe (menu info)",
+                   "méfiance si « 4K » à très bas prix (faux 4K)"],
+}
 
 _DEFECTS = [(g, re.compile(p), label, impact) for g, p, label, impact in DEFECTS]
 _POSITIVES = [(re.compile(p), label) for p, label in POSITIVES]
@@ -127,6 +190,8 @@ def find_missing(text: str, niche: Niche | None) -> list[Finding]:
 
 def inspect_listing(listing: Listing, niche: Niche | None) -> Inspection:
     text = f"{listing.title}. {listing.description or ''}"
+    if listing.translation:          # foreign listing: also read the French translation
+        text += f". {listing.translation.get('title', '')}. {listing.translation.get('text', '')}"
     findings = find_missing(text, niche)
 
     worst: dict[str, Finding] = {}
@@ -162,8 +227,9 @@ def inspect_listing(listing: Listing, niche: Niche | None) -> Inspection:
     verification = None
     if niche and niche.vinted_verification and listing.price >= niche.verification_min_price:
         verification = niche.vinted_verification
+    checks = (niche.authenticity or AUTH_CHECKS.get(niche.id, [])) if niche else []
     return Inspection(findings=findings, specs=specs, missing_specs=[k for k in needed if k not in specs],
-                      verification=verification)
+                      verification=verification, auth_checks=checks[:3])
 
 
 def apply_inspection(valuation: Valuation, insp: Inspection) -> Valuation:

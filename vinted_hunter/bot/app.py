@@ -33,6 +33,7 @@ from ..config import RuntimeSettings
 from ..models import Condition, Deal, SearchSpec
 from ..config import Settings
 from ..runtime import Services, build_services
+from ..criteria import apply_to_spec, parse_request
 from ..vinted.client import VintedUnavailable
 from . import views as v
 
@@ -517,7 +518,9 @@ class HunterBot:
             except (BudgetExceeded, RuntimeError) as exc:
                 log.warning("intent parsing failed: %s", exc)
         spec = base or SearchSpec()
-        spec.query = (data.get("query") or text)[:80]
+        parsed = parse_request(text)              # hard filters, works even when the AI is unreachable
+        apply_to_spec(spec, parsed)
+        spec.query = (data.get("query") or parsed["query"] or text)[:80]
         if self.sv.niches.get(data.get("niche_id")):
             spec.niche_id = data["niche_id"]
         elif not spec.niche_id and (niche := self.sv.niches.guess(spec.query)):
@@ -534,7 +537,7 @@ class HunterBot:
         questions = [q for q in data.get("questions") or []
                      if isinstance(q, dict) and q.get("question") and len(q.get("options") or []) >= 2][:2]
         context.user_data["pending"] = {"spec": spec, "questions": questions, "step": 0,
-                                        "watch": bool(data.get("watch"))}
+                                        "watch": bool(data.get("watch") or parsed["watch"])}
         niche = self.sv.niches.get(spec.niche_id)
         understood = f"🧭 J'ai compris : <b>{v.e(spec.describe())}</b>" + (f" · {v.e(niche.label)}" if niche else "")
         try:

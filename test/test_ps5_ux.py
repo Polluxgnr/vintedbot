@@ -168,3 +168,31 @@ def test_foreign_card_is_translated_or_flagged():
                                                                               "text": "Très bon état, peu utilisé"}})})
     cap2 = deal_caption(d2)
     assert "traduite" in cap2 and "Très bon état, peu utilisé" in cap2 and "Condizioni" not in cap2
+
+
+@pytest.mark.parametrize("title,desc,label", [
+    ("Nintendo switch", "Console che non si accende non so il motivo venduta così com’è senza accessori", "ne fonctionne pas"),
+    ("Olympus Mju I with original case | READ", "it has a battery drain issue", "batterie défaillante"),
+    ("PS5", "Konsole startet nicht, für Bastler", "ne fonctionne pas"),
+    ("iPhone 13", "No enciende, para piezas", "ne fonctionne pas"),
+])
+def test_foreign_defects_detected(title, desc, label):
+    from vinted_hunter.inspection import inspect_listing
+    insp = inspect_listing(make(title, 60, description=desc), None)
+    assert label in [f.label for f in insp.defects]
+
+
+@pytest.mark.parametrize("desc", ["Never broken, works perfectly, no issues", "Condizioni ottime, mai rotto",
+                                  "Très bon état, fonctionne parfaitement"])
+def test_healthy_listings_have_no_major_defect(desc):
+    from vinted_hunter.inspection import inspect_listing
+    assert not [f for f in inspect_listing(make("Switch OLED", 200, description=desc), None).defects if f.impact >= 0.3]
+
+
+def test_broken_item_is_never_a_pepite():
+    from vinted_hunter.config import RuntimeSettings
+    from vinted_hunter.models import Valuation
+    from vinted_hunter.scoring import build_deal, gate_fails
+    l = make("Nintendo switch", 65, description="Console che non si accende", details_loaded=True)
+    d = build_deal(l, Valuation(fair_value=150, low=120, high=180, confidence=0.9), None, RuntimeSettings())
+    assert any(f.startswith("défaut majeur") for f in gate_fails(d, None, RuntimeSettings(), require_market=False))

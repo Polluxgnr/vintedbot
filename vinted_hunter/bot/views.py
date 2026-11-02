@@ -214,6 +214,8 @@ def deal_caption(d: Deal, *, personal: bool = False, compact: bool = True) -> st
     if insp and insp.verification:
         lines.append("🛡 Vérification Vinted " + ("électronique" if insp.verification == "electronics" else "d'authenticité")
                      + " probablement dispo (option payante, à confirmer au paiement)")
+    if insp and insp.auth_checks:
+        lines.append("🔎 <b>Avant d'acheter</b> : " + e(" · ".join(insp.auth_checks[:2 if compact else 3])))
     if d.profit is not None:
         label = "Économie vs cote" if personal else "Profit net"
         lines.append(f"💰 {label} <b>{d.profit:+.0f} €</b> ({d.margin_pct:+.0f}%)")

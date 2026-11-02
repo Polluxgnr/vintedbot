@@ -115,9 +115,9 @@ class Listing(BaseModel):
     model_key: str | None = None
     model_name: str | None = None
     details_loaded: bool = False
-    scam_hint: str | None = None
+    scam_hint: str | None = None       # set by cross-listing checks (e.g. a network of identical listings)
     lang: str | None = None             # detected language of a foreign listing (it, es, de...)
-    translation: dict[str, str] | None = None   # {"title", "text"} in French, for foreign listings       # set by cross-listing checks (e.g. a network of identical listings)
+    translation: dict[str, str] | None = None   # {"title", "text"} in French, for foreign listings
 
     @property
     def age_minutes(self) -> float | None:
@@ -140,6 +140,7 @@ class Inspection(BaseModel):
     specs: dict[str, str] = Field(default_factory=dict)       # storage, ram, cpu, battery... read from the listing
     missing_specs: list[str] = Field(default_factory=list)    # price-relevant specs the seller didn't give
     verification: str | None = None                           # Vinted verification likely offered for this item
+    auth_checks: list[str] = Field(default_factory=list)      # how to check this item is genuine
 
     @property
     def missing(self) -> list[Finding]:
@@ -285,6 +286,10 @@ class SearchSpec(BaseModel):
     goal: str = "resell"               # "resell" | "personal"
     min_profit: float | None = None
     notes: str | None = None           # free text constraints for the AI ("pas de rayures", "boîte d'origine"...)
+    sizes: list[str] = Field(default_factory=list)      # hard size filter (M, 42, W32...)
+    must: list[str] = Field(default_factory=list)       # regexes the listing must contain (logo graphique...)
+    must_not: list[str] = Field(default_factory=list)   # regexes that disqualify it (rayé, motif...)
+    labels: list[str] = Field(default_factory=list)     # human names of must/must_not, for display
 
     def describe(self) -> str:
         parts = [f"« {self.query} »" if self.query else "niche"]
@@ -294,6 +299,9 @@ class SearchSpec(BaseModel):
             parts.append("/".join(c.label for c in self.conditions))
         if self.size_hint:
             parts.append(f"taille {self.size_hint}")
+        parts += self.labels
+        if self.goal == "personal":
+            parts.append("pour moi")
         if self.goal == "resell" and self.min_profit:
             parts.append(f"profit ≥ {self.min_profit:.0f} €")
         return " · ".join(parts)
