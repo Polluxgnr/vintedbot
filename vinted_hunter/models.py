@@ -181,7 +181,8 @@ class SellerCheck(BaseModel):
 class MarketCheck(BaseModel):
     """Live comparison against the identical listings currently on sale."""
 
-    n: int = 0                         # identical active listings found (same model)
+    n: int = 0                         # identical listings on sale right now (live search) - the ranking base
+    history: int = 0                   # distinct identical listings seen in the last 14 days (median base)
     median: float | None = None
     p25: float | None = None
     cheaper: int = 0                   # identical listings cheaper than this one

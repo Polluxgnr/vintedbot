@@ -38,11 +38,14 @@ def e(text: object) -> str:
 def _age(minutes: float | None) -> str:
     if minutes is None:
         return ""
+    # Ages are estimated (feed poll time, id clock): show them as such, never a falsely exact "0 min".
+    if minutes < 10:
+        return "il y a moins de 10 min"
     if minutes < 60:
-        return f"il y a {minutes:.0f} min"
+        return f"il y a ~{max(10, round(minutes / 5) * 5):.0f} min"
     if minutes < 48 * 60:
-        return f"il y a {minutes / 60:.0f} h"
-    return f"il y a {minutes / 1440:.0f} j"
+        return f"il y a ~{minutes / 60:.0f} h"
+    return f"il y a ~{minutes / 1440:.0f} j"
 
 
 # ------------------------------------------------------------------ menus
@@ -371,8 +374,11 @@ def market_line(d: Deal) -> str:
     if not mc or not mc.n:
         return "📊 Marché : aucune annonce identique trouvée en ce moment"
     rank = "la moins chère" if mc.cheaper == 0 else f"{mc.cheaper} moins chère(s)"
-    under = f", −{(1 - d.listing.price / mc.median) * 100:.0f}% vs médiane {mc.median:.0f} €" if mc.median else ""
-    return f"📊 Marché en direct : {rank} sur {mc.n + 1} annonces identiques{under}"
+    line = f"📊 Marché : {rank} des {mc.n + 1} identiques en ligne"
+    if mc.median:
+        base = f"{mc.n + mc.history} annonces" + (" sur 14 j" if mc.history else "")
+        line += f" · −{(1 - d.listing.price / mc.median) * 100:.0f}% vs médiane {mc.median:.0f} € ({base})"
+    return line
 
 
 def explain_deal(d: Deal) -> str:

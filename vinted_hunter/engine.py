@@ -77,7 +77,7 @@ class Hunter:
         # A listing the niche rejects (cover, empty box, stand...) must never feed a model's price memory:
         # 126 PS5 accessories at ~30 € once dragged the "PS5" comparables down to 30 €.
         excluded = niche is not None and niche.excluded_by(normalize(listing.title)) is not None
-        ref = niche.identify(listing.title, listing.description) if niche and not excluded else None
+        ref = niche.identify(listing.title, listing.description, listing.price) if niche and not excluded else None
         if ref and listing.price < ref.resale * MODEL_PRICE_FLOOR:
             ref = None   # "FIFA 21 ps5" at 3 €: a game or an accessory named after the console, not the console
         if ref:
@@ -367,17 +367,20 @@ class Hunter:
         mine = deal.listing.condition.value_factor
         # Compare like with like: every price expressed in this listing's condition. The live page gives the
         # cheapest identical listings (rank); the stored comparables of the last 2 weeks complete the median.
-        stored = await self.db.comparables(deal.listing.model_key or "", days=14, exclude_id=deal.listing.id)
-        live_ids = {l.id for l in same}
-        norm = sorted([l.price / l.condition.value_factor * mine for l in same]
-                      + [p / c.value_factor * mine for p, c in stored][: max(0, 60 - len(live_ids))])
-        check = MarketCheck(n=len(norm))
+        # Rank = live identical listings only (what you'd compete with today). Median = live + one price per
+        # listing seen in 14 days (a listing observed 10 times counts once).
+        live = sorted(l.price / l.condition.value_factor * mine for l in same)
+        stored = await self.db.distinct_comparables(deal.listing.model_key or "", days=14,
+                                                    exclude_ids={l.id for l in same} | {deal.listing.id})
+        norm = sorted(live + [p / c.value_factor * mine for p, c in stored])
+        check = MarketCheck(n=len(live), history=len(stored))
         if norm:
             median, q1, _ = robust_center(norm)
             check.median, check.p25 = round(median, 2), round(q1, 2)
-            check.cheaper = sum(1 for l in same if l.price / l.condition.value_factor * mine < deal.listing.price - 0.01)
-            check.cheapest_other = round(norm[0], 2)
-            check.percentile = round(1 - check.cheaper / len(norm), 2)
+        if live:
+            check.cheaper = sum(1 for p in live if p < deal.listing.price - 0.01)
+            check.cheapest_other = round(live[0], 2)
+            check.percentile = round(1 - check.cheaper / len(live), 2)
         # Re-value with the fresh comparables, keep the check, then apply the gate.
         fresh = await self._value(deal.listing, niche, rs, spec, deal.verdict)
         # Seller's wardrobe: only when the deal is otherwise a contender (1 request).

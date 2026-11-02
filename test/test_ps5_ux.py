@@ -196,3 +196,47 @@ def test_broken_item_is_never_a_pepite():
     l = make("Nintendo switch", 65, description="Console che non si accende", details_loaded=True)
     d = build_deal(l, Valuation(fair_value=150, low=120, high=180, confidence=0.9), None, RuntimeSettings())
     assert any(f.startswith("défaut majeur") for f in gate_fails(d, None, RuntimeSettings(), require_market=False))
+
+
+@pytest.mark.parametrize("niche,title,key", [
+    ("retro_gaming", "Pokemon ultra lune 3ds sous blister", None),
+    ("retro_gaming", "Zelda Majoras Mask 3DS Español", None),
+    ("retro_gaming", "New 3DS XL édition Pokémon", "n3ds"),
+    ("retro_gaming", "Game Boy Color jaune", "gbc"),
+    ("consoles", "Mario Kart 8 Nintendo Switch", None),
+    ("consoles", "Spider-Man 2 PS5", None),
+    ("consoles", "Switch OLED édition Zelda", "switch_oled"),
+    ("consoles", "PS5 slim + Spider-Man 2", "ps5_slim"),
+])
+def test_games_are_not_consoles(niche, title, key):
+    m = CATALOG.get(niche).identify(title)
+    assert (m.key if m else None) == key
+
+
+def test_market_line_is_honest_about_its_base():
+    from vinted_hunter.bot.views import market_line
+    from vinted_hunter.models import MarketCheck
+    from types import SimpleNamespace
+    d = SimpleNamespace(listing=make("x", 60), market_check=MarketCheck(n=6, history=40, median=150, cheaper=0))
+    line = market_line(d)
+    assert "des 7 identiques en ligne" in line and "46 annonces sur 14 j" in line and "61" not in line
+
+
+def test_ages_and_confidence_are_not_falsely_precise():
+    from vinted_hunter.bot.views import _age
+    from vinted_hunter.market import estimate
+    from vinted_hunter.models import Condition
+    assert _age(0) == "il y a moins de 10 min" and _age(23) == "il y a ~25 min"
+    wide = estimate(Condition.NEW, reference=235, comps=[(157, Condition.NEW), (425, Condition.NEW)] * 20)
+    assert wide.confidence < 0.8
+
+
+@pytest.mark.parametrize("title,key", [
+    ("Pokemon Emeraude GBA", "pkmn_emerald"),
+    ("Pokémon HeartGold DS complet", "pkmn_hgss"),
+    ("Pokemon Jaune Game Boy", "pkmn_gb"),
+    ("Pokemon ultra lune 3ds sous blister", None),
+])
+def test_retro_games_keep_their_own_models(title, key):
+    m = CATALOG.get("retro_gaming").identify(title)
+    assert (m.key if m else None) == key

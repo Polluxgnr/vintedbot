@@ -81,11 +81,16 @@ def estimate(
 
     factor = condition.value_factor
     fair = round(baseline_value * factor, 2)
+    lo = round((low or fair / factor * 0.8) * factor, 2)
+    hi = round((high or fair / factor * 1.2) * factor, 2)
+    # A wide price range is uncertainty, whatever the number of sources: "235 € (157-425)" can't be 97 % sure.
+    width = (hi - lo) / fair if fair else 1.0
+    confidence = min(confidence, 0.92, max(0.35, 1.1 - 0.5 * width))
     return Valuation(
         fair_value=fair,
-        low=round((low or fair / factor * 0.8) * factor, 2),
-        high=round((high or fair / factor * 1.2) * factor, 2),
-        confidence=min(confidence, 0.97),
+        low=lo,
+        high=hi,
+        confidence=round(confidence, 2),
         comps_count=len(comps),
         sources={src: round(v * factor, 2) for v, _, src in estimates},
         new_price=new_price,

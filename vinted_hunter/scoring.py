@@ -234,8 +234,9 @@ def gate_fails(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: Searc
         mc = deal.market_check
         if mc is None:
             fails.append("marché pas encore vérifié")
-        elif mc.n < 5:
-            fails.append(f"seulement {mc.n} annonces identiques : impossible de confirmer")
+        elif mc.n < 3 or mc.n + mc.history < 8:
+            fails.append(f"seulement {mc.n} annonce(s) identique(s) en ligne et {mc.history} vues en 14 j : "
+                         "impossible de confirmer")
         else:
             if mc.cheaper > 1:
                 fails.append(f"{mc.cheaper} annonces identiques moins chères")

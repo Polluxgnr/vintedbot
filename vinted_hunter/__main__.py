@@ -30,7 +30,7 @@ def _print_deals(deals, limit: int = 15) -> None:
         print(f"{'':>34}{d.listing.url}")
         if d.market_check:
             mc = d.market_check
-            print(f"{'':>34}📊 {mc.cheaper} moins chère(s) sur {mc.n} identiques, médiane {mc.median}")
+            print(f"{'':>34}📊 {mc.cheaper} moins chère(s) sur {mc.n} identiques en ligne (+{mc.history} sur 14 j), médiane {mc.median}")
         if d.gate_fails:
             print(f"{'':>34}🚫 {' | '.join(d.gate_fails[:3])}")
         if d.verdict and d.verdict.summary:

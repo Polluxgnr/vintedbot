@@ -321,6 +321,23 @@ class Database:
         )
         return [(r["price"], Condition.parse(r["condition"])) for r in rows]
 
+    async def distinct_comparables(self, model_key: str, *, days: int = 14, exclude_ids: set[int] = frozenset(),
+                                   limit: int = 300) -> list[tuple[float, Condition]]:
+        """One price per listing (its latest), so a listing seen 10 times counts once."""
+        since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        rows = await self._all(
+            # SQLite: bare columns next to MAX() come from the row holding the max -> each listing's latest price.
+            "SELECT listing_id, price, condition, MAX(observed_at) AS t FROM price_obs WHERE model_key=? "
+            "AND observed_at>=? GROUP BY listing_id ORDER BY t DESC LIMIT ?",
+            (model_key, since, limit + len(exclude_ids)),
+        )
+        out, seen = [], set(exclude_ids)
+        for r in rows:
+            if r["listing_id"] not in seen:
+                seen.add(r["listing_id"])
+                out.append((r["price"], Condition.parse(r["condition"])))
+        return out[:limit]
+
     async def market_snapshot(self, model_key: str, days: int = 45) -> dict[str, Any]:
         prices = sorted(p for p, _ in await self.comparables(model_key, days=days))
         if not prices:

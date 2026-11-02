@@ -61,6 +61,7 @@ class RefModel(BaseModel):
     resale: float                     # typical resale price, very good condition, on Vinted
     new: float | None = None          # approximate retail price new (prix neuf)
     generic: bool = False             # catch-all model ("Stone Island (autre)"): never enough for a pépite
+    hardware: bool = False            # a console/device: a game title in the listing means it's not this model
     exclude: list[str] = Field(default_factory=list)
 
     @cached_property
@@ -114,6 +115,7 @@ class Niche(BaseModel):
     models: list[RefModel] = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
     model_guard: list[str] = Field(default_factory=list)  # title says it's another product type -> no model
+    game_guard: list[str] = Field(default_factory=list)   # title is a game -> no hardware model (games keep theirs)
     alone: list[AloneRule] = Field(default_factory=list)
     collectible: bool = False         # can resell above retail (sneakers, retro, TCG...) -> no retail cap
     vinted_verification: str | None = None   # "electronics" | "authenticity": Vinted's optional paid check
@@ -143,7 +145,7 @@ class Niche(BaseModel):
             return "accessoire seul"
         return None
 
-    def identify(self, title: str, description: str | None = None) -> RefModel | None:
+    def identify(self, title: str, description: str | None = None, price: float | None = None) -> RefModel | None:
         """Most specific reference model matching the title.
 
         Descriptions are deliberately ignored: sellers stuff them with keywords
@@ -153,6 +155,10 @@ class Niche(BaseModel):
         if any(re.search(g, text) for g in self.model_guard):
             return None   # a game, a controller, a card, a kids' item... not the reference product
         hits = [m for m in self.models if m.matches(text)]
+        if any(re.search(g, text) for g in self.game_guard):
+            # "Zelda Majora's Mask 3DS" is a game, not a 3DS. But "Switch 2 Mario Kart World" at 420 € is the
+            # console bundle: a game title only rules out hardware priced under half of it.
+            hits = [m for m in hits if not m.hardware or (price is not None and price >= m.resale * 0.5)]
         # A precise model beats a generic family ("Stanmore III" beats "Enceinte Marshall"),
         # then the longest pattern wins: "airpods pro 2" beats "airpods pro"
         return max(hits, key=lambda m: (not m.generic, max(len(p) for p in m.match))) if hits else None

@@ -212,6 +212,8 @@ niches:
       - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:manettes?|controllers?|dualsense|dual sense|joy ?cons?|joystick|mando|mandos|comando|comandos|controle|kontroller|gamepad|volant|amiibo|jeux?|games?|juego|spiel|gioco|steelbook|cartouche|cartridge|collection|anniversary|aniversario|remaster\w*|deluxe|goty|dlc|season pass|portal|casque|headset|camera|remote|telecommande|lecteur seul|disc drive|disk drive|accessoires?)\b'
       - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|incl\w*|complete?|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:housse|etui|sacoche|coque|carcasa|cover|faceplates?|facade|plaques?|cache|socle|stand|support|silicone|skin|alimentation|power supply|tampas?|tapas?|carcaca|stickers?|autocollants?|protection|ventilateur|ventola|refroidissement|cooler|cooling|station de charge|charging|chargeur|dock seul|boite vide|boite seule|empty box|caja vacia|scatola|gashapon|figurine|lego|3d ?print|rangement|presentoir|tapis|kit|decoration|custom)\b'
       - '\b(?:playstation portal|ps portal|portal remote)\b|\bportable\b.*\bps ?5\b|\bps ?5\b.*\bportable\b|\bportal\b.*\bps ?5\b|\bps ?5\b.*\bportal\b'
+    game_guard:   # a game title rules out a console priced under half of its value
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|oled|\blite\b|slim|digital|numerique|\bpro\b|edition limitee|limited edition|\d+ ?(?:go|gb|to|tb)\b)).*\b(?:zelda|mario|pokemon|kirby|metroid|splatoon|smash|xenoblade|animal crossing|fifa|ea ?fc|call of duty|gta|grand theft|spider ?man|god of war|elden ring|hogwarts|baldur|cyberpunk|assassin|red dead|horizon|gran turismo|last of us|ratchet|astro bot|final fantasy|resident evil|minecraft|nba ?2k|forza|halo|starfield|diablo|mortal kombat|tekken|street fighter|sonic|lego|just dance|ghost of|uncharted|demon souls|returnal|stellar blade|black myth|monster hunter|dragon ball|naruto|one piece)\b'
     components: [{name: manettes/Joy-Con, match: 'joy ?cons?|manettes?|controllers?', share: 0.22}, {name: dock, match: 'dock|station|socle', share: 0.12}, {name: alimentation/câbles, match: 'chargeur|alimentation|cables?|hdmi|bloc secteur', share: 0.06}, {name: boîte, match: 'boite|carton', share: 0.03}]
     alone: [{match: 'console seule|console uniquement|uniquement la console|tablette seule|ecran seul|sans accessoires?|sans rien', missing: [manettes/Joy-Con, dock, alimentation/câbles]}]
     exclude: ['^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\boled\b|\blite\b)).*\b(?:jeux?|juego|game|spiel|gioco|precinto|scelle)\b', '^jeux?\b', '\bjeu seul\b', '\bmanette seule\b', '^coque\b', '\bskin\b', '\bsupport\b', '\bstation de charge\b',
@@ -219,29 +221,29 @@ niches:
     red_flags: [console bannie, joy-con drift, lecteur disque bruyant (PS5), console "reconditionnée" sans détail, numéro de série masqué]
     vision_checklist: [rayures écran, état joy-con/manettes, accessoires (dock, câbles), numéro de série, boîte]
     models:
-      - {key: switch_oled, name: Switch OLED, match: ['switch oled'], resale: 220, new: 349}
-      - {key: switch2, name: Switch 2, match: ['switch 2\b'], resale: 400, new: 469}
-      - {key: switch_v2, name: Switch (standard), match: ['nintendo switch\b'], exclude: ['oled', 'lite', 'switch 2'], resale: 150, new: 299}
-      - {key: switch_lite, name: Switch Lite, match: ['switch lite'], resale: 110, new: 219}
-      - {key: ps5_pro, name: PS5 Pro, match: ['(?:ps ?5|playstation 5) ?pro\b'], resale: 560, new: 799}
-      - {key: ps5_slim_digital, name: PS5 Slim Digital, match: ['(?:ps ?5|playstation 5).*slim.*(?:digital|numerique|digitale)|(?:ps ?5|playstation 5).*(?:digital|numerique|digitale).*slim'], resale: 300, new: 449}
-      - {key: ps5_slim_disc, name: PS5 Slim lecteur, match: ['(?:ps ?5|playstation 5).*slim.*(?:lecteur|disque|disc|disk|standard|blu ?ray)|(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray).*slim'], resale: 350, new: 549}
-      - {key: ps5_slim, name: PS5 Slim (version à confirmer), match: ['(?:ps ?5|playstation 5).*slim'], exclude: ['(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)', '\bpro\b'], resale: 320, generic: true}
-      - {key: ps5_digital, name: PS5 Digital (fat), match: ['(?:ps ?5|playstation 5).*(?:digital|numerique|digitale)'], exclude: ['slim', '\bpro\b'], resale: 250}
-      - {key: ps5_disc, name: PS5 lecteur (fat), match: ['(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray)'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)'], resale: 300}
-      - {key: ps5_unknown, name: PS5 (version à confirmer), match: ['\bps ?5\b|playstation 5'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)'], resale: 290, generic: true}
-      - {key: steamdeck_oled, name: Steam Deck OLED, match: ['steam ?deck oled'], resale: 430, new: 569}
-      - {key: steamdeck, name: Steam Deck LCD, match: ['steam ?deck'], exclude: ['oled'], resale: 280}
-      - {key: xsx, name: Xbox Series X, match: ['xbox series x'], resale: 300, new: 549}
-      - {key: ps4_pro, name: PS4 Pro, match: ['(ps ?4|playstation 4) pro'], resale: 170}
-      - {key: ps4_slim, name: PS4 Slim, match: ['(ps ?4|playstation 4) slim'], exclude: ['pro'], resale: 125}
-      - {key: ps4_fat, name: PS4 (fat), match: ['\bps ?4\b|playstation 4'], exclude: ['slim', 'pro', 'manette seule', '^jeux?'], resale: 95}
-      - {key: xss, name: Xbox Series S, match: ['xbox series s\b'], resale: 190, new: 349}
-      - {key: xbox_one_x, name: Xbox One X, match: ['xbox one x\b'], resale: 140}
-      - {key: xbox_one_s, name: Xbox One S, match: ['xbox one s\b'], resale: 90}
-      - {key: wiiu, name: Wii U, match: ['wii ?u\b'], resale: 90}
-      - {key: psvita, name: PS Vita, match: ['ps ?vita'], resale: 140}
-      - {key: quest3, name: Meta Quest 3, match: ['quest 3\b'], exclude: ['3s'], resale: 360, new: 549}
+      - {key: switch_oled, name: Switch OLED, match: ['switch oled'], resale: 220, new: 349, hardware: true}
+      - {key: switch2, name: Switch 2, match: ['switch 2\b'], resale: 400, new: 469, hardware: true}
+      - {key: switch_v2, name: Switch (standard), match: ['nintendo switch\b'], exclude: ['oled', 'lite', 'switch 2'], resale: 150, new: 299, hardware: true}
+      - {key: switch_lite, name: Switch Lite, match: ['switch lite'], resale: 110, new: 219, hardware: true}
+      - {key: ps5_pro, name: PS5 Pro, match: ['(?:ps ?5|playstation 5) ?pro\b'], resale: 560, new: 799, hardware: true}
+      - {key: ps5_slim_digital, name: PS5 Slim Digital, match: ['(?:ps ?5|playstation 5).*slim.*(?:digital|numerique|digitale)|(?:ps ?5|playstation 5).*(?:digital|numerique|digitale).*slim'], resale: 300, new: 449, hardware: true}
+      - {key: ps5_slim_disc, name: PS5 Slim lecteur, match: ['(?:ps ?5|playstation 5).*slim.*(?:lecteur|disque|disc|disk|standard|blu ?ray)|(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray).*slim'], resale: 350, new: 549, hardware: true}
+      - {key: ps5_slim, name: PS5 Slim (version à confirmer), match: ['(?:ps ?5|playstation 5).*slim'], exclude: ['(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)', '\bpro\b'], resale: 320, generic: true, hardware: true}
+      - {key: ps5_digital, name: PS5 Digital (fat), match: ['(?:ps ?5|playstation 5).*(?:digital|numerique|digitale)'], exclude: ['slim', '\bpro\b'], resale: 250, hardware: true}
+      - {key: ps5_disc, name: PS5 lecteur (fat), match: ['(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray)'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)'], resale: 300, hardware: true}
+      - {key: ps5_unknown, name: PS5 (version à confirmer), match: ['\bps ?5\b|playstation 5'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)'], resale: 290, generic: true, hardware: true}
+      - {key: steamdeck_oled, name: Steam Deck OLED, match: ['steam ?deck oled'], resale: 430, new: 569, hardware: true}
+      - {key: steamdeck, name: Steam Deck LCD, match: ['steam ?deck'], exclude: ['oled'], resale: 280, hardware: true}
+      - {key: xsx, name: Xbox Series X, match: ['xbox series x'], resale: 300, new: 549, hardware: true}
+      - {key: ps4_pro, name: PS4 Pro, match: ['(ps ?4|playstation 4) pro'], resale: 170, hardware: true}
+      - {key: ps4_slim, name: PS4 Slim, match: ['(ps ?4|playstation 4) slim'], exclude: ['pro'], resale: 125, hardware: true}
+      - {key: ps4_fat, name: PS4 (fat), match: ['\bps ?4\b|playstation 4'], exclude: ['slim', 'pro', 'manette seule', '^jeux?'], resale: 95, hardware: true}
+      - {key: xss, name: Xbox Series S, match: ['xbox series s\b'], resale: 190, new: 349, hardware: true}
+      - {key: xbox_one_x, name: Xbox One X, match: ['xbox one x\b'], resale: 140, hardware: true}
+      - {key: xbox_one_s, name: Xbox One S, match: ['xbox one s\b'], resale: 90, hardware: true}
+      - {key: wiiu, name: Wii U, match: ['wii ?u\b'], resale: 90, hardware: true}
+      - {key: psvita, name: PS Vita, match: ['ps ?vita'], resale: 140, hardware: true}
+      - {key: quest3, name: Meta Quest 3, match: ['quest 3\b'], exclude: ['3s'], resale: 360, new: 549, hardware: true}
 
   retro_gaming:
     feed_catalogs: [3025, 3026]
@@ -261,6 +263,8 @@ niches:
     model_guard:
       - '\b(?:cartes?|cards?|tcg|holo|booster|reverse|\d{1,3}/\d{2,3})\b'
       - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|complete?|oled|lite|\bgo\b|\bgb\b|\bto\b|\btb\b)).*\b(?:manettes?|controllers?|joystick)\b'
+    game_guard:   # a game title blocks the console models (hardware: true), not the game models
+      - '^(?!.*(?:console|consola|konsole|pack|bundle|\+|avec|with|\bcon\b|\bmit\b|\bxl\b|\bll\b|\bnew 2ds\b|edition limitee|limited edition)).*\b(?:jeux?|games?(?! ?boy)(?! ?cube)(?! ?gear)|juegos?|spiel|gioco|giochi|cartouches?|cartridges?|blister|scelle|sealed|pokemon|zelda|mario|kirby|metroid|fire emblem|animal crossing|donkey kong|luigi|yoshi|pikmin|sonic|smash|xenoblade|monster hunter|layton|bravely|dragon quest|final fantasy|kingdom hearts|castlevania|resident evil|street fighter|tetris|golden sun|advance wars|wario|star fox|f zero|earthbound|chrono|majora|ocarina|minish|pokemon \w+|lego \w+|fifa|pes|crash|spyro|rayman|harry potter|disney)\b'
     components: [{name: manette, match: 'manettes?', share: 0.15}, {name: alimentation/câbles, match: 'alimentation|chargeur|cables?|peritel', share: 0.08}, {name: cache piles, match: 'cache piles?|clapet', share: 0.05}, {name: boîte/notice, match: 'boite|notice', share: 0.1}]
     alone: []
     allow: ['\bhs\b']
@@ -269,15 +273,15 @@ niches:
     vision_checklist: [étiquette cartouche (brillance, découpe), code de lot sur la cartouche, état écran (rayures, pixels morts), compartiment piles (oxydation), complet en boîte (CIB)]
     ai_hints: "Les lots \"vide-grenier\" vendus en vrac sont la meilleure source de profit - estime la valeur pièce par pièce. Les jeux Pokémon GBA/DS/GB sont massivement contrefaits."
     models:
-      - {key: gbc, name: Game Boy Color, match: ['game ?boy colou?r'], resale: 70}
-      - {key: gba_sp, name: Game Boy Advance SP, match: ['advance sp\b', '\bgba sp\b'], resale: 90}
-      - {key: gba, name: Game Boy Advance, match: ['game ?boy advance\b'], exclude: ['sp\b'], resale: 60}
-      - {key: gb_dmg, name: Game Boy (DMG), match: ['game ?boy (?:classic|dmg|original|1989)'], resale: 65}
-      - {key: gamecube, name: GameCube console, match: ['gamecube|game cube'], exclude: ['\bjeux?\b', 'manette', 'controller', 'joystick', 'game boy player', 'memory card'], resale: 110}
-      - {key: n64, name: Nintendo 64 console, match: ['nintendo 64|\bn64\b'], exclude: ['\bjeu\b'], resale: 85}
-      - {key: snes, name: Super Nintendo, match: ['super nintendo|\bsnes\b'], exclude: ['mini'], resale: 85}
-      - {key: ds_lite, name: DS Lite, match: ['ds lite'], resale: 45}
-      - {key: n3ds, name: 3DS / New 3DS, match: ['\b3ds\b'], resale: 110}
+      - {key: gbc, name: Game Boy Color, match: ['game ?boy colou?r'], resale: 70, hardware: true}
+      - {key: gba_sp, name: Game Boy Advance SP, match: ['advance sp\b', '\bgba sp\b'], resale: 90, hardware: true}
+      - {key: gba, name: Game Boy Advance, match: ['game ?boy advance\b'], exclude: ['sp\b'], resale: 60, hardware: true}
+      - {key: gb_dmg, name: Game Boy (DMG), match: ['game ?boy (?:classic|dmg|original|1989)'], resale: 65, hardware: true}
+      - {key: gamecube, name: GameCube console, match: ['gamecube|game cube'], exclude: ['\bjeux?\b', 'manette', 'controller', 'joystick', 'game boy player', 'memory card'], resale: 110, hardware: true}
+      - {key: n64, name: Nintendo 64 console, match: ['nintendo 64|\bn64\b'], exclude: ['\bjeu\b'], resale: 85, hardware: true}
+      - {key: snes, name: Super Nintendo, match: ['super nintendo|\bsnes\b'], exclude: ['mini'], resale: 85, hardware: true}
+      - {key: ds_lite, name: DS Lite, match: ['ds lite'], resale: 45, hardware: true}
+      - {key: n3ds, name: 3DS / New 3DS, match: ['\b3ds\b'], resale: 110, hardware: true}
       - {key: pkmn_emerald, name: Pokémon Émeraude, match: ['pokemon emeraude|pokemon emerald'], resale: 110}
       - {key: pkmn_hgss, name: Pokémon HeartGold/SoulSilver, match: ['heart ?gold|soul ?silver|or heartgold|argent soulsilver'], resale: 120}
       - {key: pkmn_gb, name: Pokémon Rouge/Bleu/Jaune/Or/Argent/Cristal, match: ['pokemon (?:rouge|bleu|jaune|or|argent|cristal|crystal)\b'], resale: 45, generic: true}
