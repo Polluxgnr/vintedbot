@@ -65,6 +65,8 @@ An alert fires only when **every** check passes:
 - **Live market check:** the bot searches the exact model on Vinted right then and compares against at least 5 identical listings, with prices normalized to the same condition. At most 1 may be cheaper, and the price must be ≥ 25 % under their median.
 - **Fake-prone niches** (luxury, watches, Apple, smartphones): the AI photo check is mandatory.
 
+**💎 Quality mode** (on by default, toggle in ⚙️ Réglages): pépites must also be **new** (with or without tags), of an identified brand model, in a low-fake-risk niche (or with Vinted's verification available), from a seller with ≥ 5 reviews and ≥ 4.5★. Niche watches then ask Vinted for new items only, so every request counts. Fewer alerts, each one fast and safe to resell. Even with the mode off, the score rewards new condition (+5/+7), low fake risk (+4) and established sellers (+3), and penalises fake-prone niches (−5/−10).
+
 Every card says what blocked it (🚫), and 🔍 *Détail du calcul* shows each number and check.
 
 ## Specs & Vinted verification

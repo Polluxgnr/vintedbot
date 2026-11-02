@@ -11,7 +11,7 @@ import math
 from .config import RuntimeSettings
 from .criteria import mismatch
 from .inspection import apply_inspection, assess_seller, inspect_listing
-from .models import AIVerdict, Deal, Finding, Inspection, Listing, Recommendation, SearchSpec, SellerCheck, Valuation
+from .models import AIVerdict, Condition, Deal, Finding, Inspection, Listing, Recommendation, SearchSpec, SellerCheck, Valuation
 from .niches import Niche, normalize
 
 # Without a photo check, scores in fake-prone niches are capped below/near the alert threshold.
@@ -169,6 +169,8 @@ def build_deal(listing: Listing, valuation: Valuation, niche: Niche | None, rs: 
     flags = flags_for(listing, valuation, niche, insp, verdict)
     target = (spec and spec.min_profit) or (niche and niche.min_profit) or rs.min_profit_eur
     parts = score_parts(listing, valuation, profit_eur, margin, flags, verdict, seller, insp, target)
+    if profit_eur is not None:
+        parts.update(quality_parts(listing, niche, insp))
     return Deal(
         listing=listing, valuation=valuation, landed_cost=cost, profit=profit_eur, margin_pct=margin,
         score=total_score(parts, profit_eur, flags, niche), flags=flags, verdict=verdict,
@@ -241,9 +243,51 @@ def gate_fails(deal: Deal, niche: Niche | None, rs: RuntimeSettings, spec: Searc
                 fails.append(f"seulement {(1 - l.price / mc.median) * 100:.0f} % sous la médiane du marché")
     if deal.wardrobe and deal.wardrobe.suspect:
         fails.append("dressing du vendeur suspect : " + ", ".join(deal.wardrobe.flags[:2]))
+    if rs.quality_mode and not (spec and spec.goal == "personal"):
+        fails += quality_fails(deal, niche)
     if deal.score < rs.min_score:
         fails.append(f"score {deal.score} < {rs.min_score}")
     return fails
+
+
+NEW_CONDITIONS = (Condition.NEW_WITH_TAGS, Condition.NEW)
+
+
+def quality_fails(deal: Deal, niche: Niche | None) -> list[str]:
+    """Quality mode: new items of a known brand model, low fake risk, established seller. Fewer alerts, each
+    one easy to resell fast (new sells 2-3x faster than used) and hard to get scammed on."""
+    l, insp = deal.listing, deal.inspection
+    fails = []
+    if l.condition not in NEW_CONDITIONS:
+        fails.append(f"qualité : état « {l.condition.label} », neuf exigé")
+    risk = niche.authenticity_risk if niche else "medium"
+    verified = bool(insp and insp.verification)
+    if risk == "very_high" and not verified:
+        fails.append("qualité : niche à contrefaçons sans vérification Vinted")
+    elif risk == "high" and not verified and not (deal.verdict and deal.verdict.tier >= 3):
+        fails.append("qualité : risque de contrefaçon, vérification Vinted ou photos IA exigées")
+    s = l.seller
+    if s.reviews is not None and (s.reviews < 5 or (s.rating is not None and s.rating < 4.5)):
+        fails.append(f"qualité : vendeur peu établi ({s.reviews} avis)")
+    return fails
+
+
+def quality_parts(listing: Listing, niche: Niche | None, insp: Inspection) -> dict[str, float]:
+    """Score weight for what makes a deal safe and fast to flip, whatever the mode."""
+    p: dict[str, float] = {}
+    if listing.condition is Condition.NEW_WITH_TAGS:
+        p["neuf avec étiquette"] = 7
+    elif listing.condition is Condition.NEW:
+        p["neuf"] = 5
+    elif listing.condition in (Condition.GOOD, Condition.SATISFACTORY):
+        p["état moyen"] = -4
+    risk = niche.authenticity_risk if niche else "medium"
+    if not insp.verification:
+        p["risque contrefaçon"] = {"low": 4, "medium": 0, "high": -5, "very_high": -10}.get(risk, 0)
+    s = listing.seller
+    if s.reviews is not None and s.reviews >= 20 and (s.rating or 0) >= 4.8:
+        p["vendeur établi"] = 3
+    return {k: v for k, v in p.items() if v}
 
 
 def radar_worthy(deal: Deal) -> bool:

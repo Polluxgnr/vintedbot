@@ -357,7 +357,7 @@ def _pepite_candidate(price=120, **kw):
 def test_pepite_requires_live_market_proof():
     from vinted_hunter.models import MarketCheck
     from vinted_hunter.scoring import gate_fails
-    rs, consoles = RuntimeSettings(), CATALOG.get("consoles")
+    rs, consoles = RuntimeSettings(quality_mode=False), CATALOG.get("consoles")
     deal = _pepite_candidate()
     assert gate_fails(deal, consoles, rs, require_market=False) == []
     assert "marché pas encore vérifié" in gate_fails(deal, consoles, rs)
@@ -399,3 +399,30 @@ def test_pepite_generic_model_and_fake_niche_blocked():
 ])
 def test_live_false_matches_no_longer_identified(niche, title):
     assert CATALOG.get(niche).identify(title) is None, title
+
+
+def test_quality_mode_wants_new_low_risk_established():
+    from vinted_hunter.scoring import gate_fails, quality_fails
+    rs, consoles = RuntimeSettings(), CATALOG.get("consoles")
+    used = _pepite_candidate()
+    assert any("neuf exigé" in f for f in quality_fails(used, consoles))
+    new = _pepite_candidate()
+    new = new.model_copy(update={"listing": new.listing.model_copy(update={"condition": Condition.NEW})})
+    assert quality_fails(new, consoles) == []
+    newbie = new.model_copy(update={"listing": new.listing.model_copy(
+        update={"seller": new.listing.seller.model_copy(update={"reviews": 1})})})
+    assert any("vendeur peu établi" in f for f in quality_fails(newbie, consoles))
+    luxury = CATALOG.get("luxury")
+    unverified = new.model_copy(update={"inspection": new.inspection.model_copy(update={"verification": None})})
+    assert any("contrefaçons" in f for f in quality_fails(unverified, luxury))
+    assert quality_fails(new, luxury) == []            # Vinted's authenticity check makes it acceptable
+    assert any("neuf exigé" in f for f in gate_fails(used, consoles, rs, require_market=False))
+
+
+def test_quality_weighs_in_score():
+    from vinted_hunter.models import Valuation
+    from vinted_hunter.scoring import build_deal
+    rs, val = RuntimeSettings(), Valuation(fair_value=300, low=260, high=340, confidence=0.8)
+    new = build_deal(make("Switch OLED", 150, Condition.NEW_WITH_TAGS), val, CATALOG.get("consoles"), rs)
+    used = build_deal(make("Switch OLED", 150, Condition.GOOD), val, CATALOG.get("consoles"), rs)
+    assert new.score_parts.get("neuf avec étiquette") == 7 and "état moyen" in used.score_parts

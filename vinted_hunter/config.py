@@ -71,6 +71,9 @@ class RuntimeSettings(BaseModel):
     """Knobs editable live from Telegram (/settings). Persisted as JSON in the kv table."""
 
     alert_mode: str = "pepites"        # "pepites" = only verified insane deals | "normal"
+    # Quality over quantity: alerts only for NEW items (with or without tags) of an identified brand model,
+    # in low-fake-risk niches (or with Vinted's verification), from an established seller.
+    quality_mode: bool = True
     min_profit_eur: float = 30.0
     min_margin_pct: float = 40.0
     min_discount_pct: float = 35.0     # price at least 35 % under the estimated value

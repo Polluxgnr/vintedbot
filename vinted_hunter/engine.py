@@ -608,6 +608,9 @@ class Hunter:
                                                                % len(queries)]})
         else:
             sub = spec
+        if rs.quality_mode and spec.goal != "personal" and not sub.conditions:
+            # Quality mode only alerts on new items: ask Vinted for those directly, every request counts.
+            sub = sub.model_copy(update={"conditions": [Condition.NEW_WITH_TAGS, Condition.NEW]})
 
         if self._interactive:
             return 0

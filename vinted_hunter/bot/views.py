@@ -109,6 +109,8 @@ HELP_PAGES = {
         "• Demande (favoris/vues) : jusqu'à 7\n\n"
         "Malus : prix suspect −18, arnaque probable −30, pièces manquantes −3 chacune, risque fake IA jusqu'à −35, "
         "verdict IA « passer » −25 (« acheter » +8).\n"
+        "Qualité : neuf avec étiquette +7, neuf +5, état moyen −4 · niche à faible risque +4, à contrefaçons "
+        "−5/−10 (sauf vérification Vinted) · vendeur établi (≥ 20 avis, ≥ 4,8★) +3.\n"
         "Plafonds : profit ≤ 0 → max 25. Niches à contrefaçons sans vérification photo : max 55 (luxe, montres, Apple) "
         "ou 75.\n\n"
         "Une alerte part si score ≥ score min, profit ≥ profit min et marge ≥ marge min (voir ⚙️ Réglages)."
@@ -130,13 +132,16 @@ HELP_PAGES = {
         "• description lue en entier, pièces manquantes et défauts déduits\n"
         "• prix ≥ 35 % sous la cote, mais pas &lt; 30 % de la cote (= autre produit ou arnaque)\n"
         "• profit ≥ 30 € (ou le min de la niche) et marge ≥ 40 %\n"
-        "• confiance de la cote ≥ 60 %, score ≥ 70\n"
+        "• confiance de la cote ≥ 60 %, score ≥ 55\n"
         "• vendeur pas 🔴, aucun signal d'arnaque\n"
         "• <b>vérification du marché en direct</b> : le bot recherche le modèle exact sur Vinted à l'instant, "
         "compare avec au moins 5 annonces identiques (même état) : au plus 1 moins chère, et ≥ 25 % sous la médiane\n"
         "• niches à contrefaçons : vérification photo IA obligatoire (luxe, montres, Apple) ou vendeur 🟢 "
-        "+ prix plausible (sneakers, streetwear…)\n\n"
-        "Tu peux repasser en mode « normal » dans ⚙️ Réglages."
+        "+ prix plausible (sneakers, streetwear…)\n"
+        "• <b>💎 mode qualité</b> (activé par défaut) : article <b>neuf</b> (avec ou sans étiquette), modèle de "
+        "marque identifié, niche à faible risque de contrefaçon (sinon vérification Vinted exigée), vendeur avec "
+        "≥ 5 avis et ≥ 4,5★. Moins d'alertes, mais faciles à revendre vite et sans mauvaise surprise.\n\n"
+        "Tu peux repasser en mode « normal » ou couper le mode qualité dans ⚙️ Réglages."
     ),
     "base": (
         "🗄 <b>La base de ventes</b>\n\n"
@@ -538,7 +543,9 @@ def settings_view(rs: RuntimeSettings, spend: float) -> tuple[str, Kb]:
     pep = rs.alert_mode == "pepites"
     lines = ["⚙️ <b>Réglages</b>\n",
              f"Mode d'alerte : <b>{'🔥 pépites vérifiées seulement' if pep else 'normal'}</b>"]
-    rows = [[Btn("🔥 Mode pépites ✅" if pep else "🔥 Passer en mode pépites", callback_data="s:alert_mode:t")]]
+    lines.append(f"Mode qualité : <b>{'💎 neuf, grandes marques, faible risque' if rs.quality_mode else 'tout état'}</b>")
+    rows = [[Btn("🔥 Mode pépites ✅" if pep else "🔥 Passer en mode pépites", callback_data="s:alert_mode:t")],
+            [Btn(f"💎 Mode qualité {'✅' if rs.quality_mode else '⬜'}", callback_data="s:quality_mode:t")]]
     for key, (label, unit, _) in SETTINGS_FIELDS.items():
         val = getattr(rs, key)
         lines.append(f"• {label} : <b>{val:g}{unit}</b>")
