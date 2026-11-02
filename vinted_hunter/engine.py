@@ -11,6 +11,8 @@
 from __future__ import annotations
 
 import asyncio
+import bisect
+from datetime import datetime, timezone
 import re
 import logging
 import statistics
@@ -56,6 +58,9 @@ class Hunter:
         self._yield: dict[int, float] = {}                 # watch -> recent good-deal yield (EWMA)
         self._last_cleanup = 0.0
         self._interactive = 0
+        self._clock: list[tuple[int, float]] = []          # (listing id, publication timestamp) samples
+        self._clock_loaded = False
+        self._feed_max: dict[tuple, int] = {}            # newest id seen per category feed
         self._harvest = self._harvest_jobs()
         self._harvest_steps = 0
         self.harvested = 0
@@ -135,6 +140,7 @@ class Hunter:
                        pool: Pool | None = None) -> list[Deal]:
         """Run listings through the cascade. mode: watch (cheap) | hunt (wider) | full (force every tier)."""
         listings = [self._identify(l, niche) for l in listings]
+        await self._date_listings(listings)                           # age of every listing (id clock)
         await self.db.upsert_listings(listings)                       # market memory, free
         await self.db.track(listings)                                 # sales database
 
@@ -171,6 +177,11 @@ class Hunter:
                 except VintedUnavailable:
                     pass
             enriched.append(l)
+        for l in enriched:
+            if l.posted_at and l.details_loaded:
+                self._clock_add(l.id, l.posted_at)
+        # Persist what the item pages taught us (description, all photos, seller, publication date).
+        await self.db.upsert_listings([l for l in enriched if l.details_loaded])
         # Items revealed as junk by their description are dropped here (still free)
         enriched = [l for l in enriched if not reject_reason(l, niche, spec)]
 
@@ -233,14 +244,73 @@ class Hunter:
 
         return await self._finalize(enriched, verdicts, niche, spec, rs, deals, pool, analysed_only=mode == "hunt")
 
+    @staticmethod
+    def _scam_networks(listings: list[Listing]) -> dict[int, str]:
+        """Copy-paste scam rings: >= 3 listings of the same model at the exact same price, where the sellers we
+        could check have no reviews. Every listing of the ring is flagged, even the ones not opened yet."""
+        groups: dict[tuple, list[Listing]] = defaultdict(list)
+        for l in listings:
+            if l.model_key and not l.model_key.startswith("sig:"):
+                groups[(l.model_key, round(l.price))].append(l)
+        flagged: dict[int, str] = {}
+        for (_, price), ring in groups.items():
+            if len(ring) < 3:
+                continue
+            checked = [l for l in ring if l.details_loaded and l.seller.reviews is not None]
+            if len(checked) >= 2 and all(l.seller.reviews == 0 for l in checked):
+                reason = f"réseau d'arnaque probable : {len(ring)} annonces identiques à {price} € de comptes sans avis"
+                flagged.update({l.id: reason for l in ring})
+        return flagged
+
     async def _finalize(self, enriched: list[Listing], verdicts: dict[int, AIVerdict], niche: Niche | None,
                         spec: SearchSpec | None, rs: RuntimeSettings, tier1: list[Deal],
                         pool: Pool | None = None, analysed_only: bool = False) -> list[Deal]:
+        rings = self._scam_networks(enriched + [d.listing for d in tier1 if d.listing.id not in {l.id for l in enriched}])
+        if rings:
+            log.info("scam network flagged: %s listings", len(rings))
+            enriched = [l.model_copy(update={"scam_hint": rings[l.id]}) if l.id in rings else l for l in enriched]
+            tier1 = [d.model_copy(update={"listing": d.listing.model_copy(update={"scam_hint": rings[d.listing.id]})})
+                     if d.listing.id in rings else d for d in tier1]
         seen = {l.id for l in enriched}
         final = [await self._value(l, niche, rs, spec, verdicts.get(l.id), pool) for l in enriched]
         if not analysed_only:
             final += [d for d in tier1 if d.listing.id not in seen]
         return sorted(final, key=lambda d: d.score, reverse=True)
+
+    async def _date_listings(self, listings: list[Listing]) -> None:
+        """Vinted ids grow with time: learn (id -> publication time) from item pages, estimate the rest.
+
+        Gives every catalog listing an age, so freshness (less competition) counts in the score.
+        """
+        if not self._clock_loaded:
+            self._clock_loaded = True
+            rows = await self.db._all(
+                "SELECT data FROM listings WHERE data LIKE '%\"posted_at\":\"20%' ORDER BY first_seen DESC LIMIT 600")
+            for r in rows:
+                l = Listing.model_validate_json(r["data"])
+                if l.posted_at:
+                    self._clock_add(l.id, l.posted_at)
+        for i, l in enumerate(listings):
+            if l.posted_at is None and (when := self._clock_estimate(l.id)):
+                listings[i] = l.model_copy(update={"posted_at": when})
+
+    def _clock_add(self, listing_id: int, when) -> None:
+        bisect.insort(self._clock, (listing_id, when.timestamp()))
+        if len(self._clock) > 2000:
+            del self._clock[::4]                          # thin evenly, keep the range
+
+    def _clock_estimate(self, listing_id: int):
+        if len(self._clock) < 20:
+            return None
+        ids = [c[0] for c in self._clock]
+        k = bisect.bisect_left(ids, listing_id)
+        lo, hi = (k - 1, k) if 0 < k < len(ids) else ((len(ids) - 2, len(ids) - 1) if k else (0, 1))
+        (i0, t0), (i1, t1) = self._clock[max(lo, 0)], self._clock[min(hi, len(ids) - 1)]
+        if i1 == i0:
+            return None
+        ts = t0 + (listing_id - i0) * (t1 - t0) / (i1 - i0)
+        now = time.time()
+        return datetime.fromtimestamp(min(ts, now), tz=timezone.utc)
 
     async def _ai_rekey(self, listing: Listing, v: AIVerdict | None, niche: Niche | None) -> Listing:
         """Let the AI's exact identification fix the model key.
@@ -489,20 +559,37 @@ class Hunter:
         rs = await self.db.runtime_settings(chat_id)
 
         if watch["kind"] == "niche" and niche:
-            queries = niche.search_queries
-            idx = self._query_cursor[watch["id"]] % len(queries)
+            cycle = self._query_cursor[watch["id"]]
             self._query_cursor[watch["id"]] += 1
-            sub = spec.model_copy(update={"query": queries[idx]})
+            if niche.feed_catalogs and cycle % 2 == 0:
+                # Sniper feed: the newest listings of the whole category, every model at once.
+                sub = spec.model_copy(update={"query": "", "catalog_ids": niche.feed_catalogs,
+                                              "price_min": spec.price_min or niche.price_min})
+            else:
+                queries = niche.search_queries
+                sub = spec.model_copy(update={"query": queries[(cycle // 2 if niche.feed_catalogs else cycle)
+                                                               % len(queries)]})
         else:
             sub = spec
 
         if self._interactive:
             return 0
         listings = await self.vinted.search(sub, order="newest_first", per_page=96)
+        if sub.catalog_ids and not sub.query and listings:
+            # Category feed, newest first: ids above the previous poll's newest id were posted since then.
+            feed_key = (watch["id"], tuple(sub.catalog_ids))
+            previous = self._feed_max.get(feed_key)
+            now = datetime.now(timezone.utc)
+            if previous:
+                for i, l in enumerate(listings):
+                    if l.id > previous and l.posted_at is None:
+                        listings[i] = l.model_copy(update={"posted_at": now})
+                        self._clock_add(l.id, now)
+            self._feed_max[feed_key] = max(l.id for l in listings)
         known = await self.db.known_prices([l.id for l in listings])
         fresh = [l for l in listings if l.id not in known or l.price < known[l.id] - 0.5]
         # First time we see a query and most results are unknown: it's the backlog, not new listings.
-        seed_key = (watch["id"], sub.query)
+        seed_key = (watch["id"], sub.query or f"feed:{sub.catalog_ids}")
         seeding = seed_key not in self._seeded and len(fresh) > 0.5 * max(len(listings), 1)
         self._seeded.add(seed_key)
 

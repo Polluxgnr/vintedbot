@@ -55,3 +55,30 @@ def test_truncated_json_recovered():
     cut = '{"recommendation": "BUY", "resale_eur": 220, "red_flags": ["a", "b"], "summary": "très long texte coup'
     assert extract_json(cut) == {"recommendation": "BUY", "resale_eur": 220, "red_flags": ["a", "b"]}
     assert extract_json('```json\n{"ok": true}\n```') == {"ok": True}
+
+
+async def test_llm_circuit_breaker_fails_fast():
+    import httpx
+    from vinted_hunter.ai.llm import LLM
+
+    calls = {"n": 0}
+
+    def handler(request):
+        calls["n"] += 1
+        raise httpx.ConnectError("reset by peer")
+
+    async def spend():
+        return 0.0
+
+    async def record(*_):
+        return None
+
+    llm = LLM("key", spend_today=spend, record_usage=record)
+    llm._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    with pytest.raises(RuntimeError, match="injoignable"):
+        await llm.complete("m", "s", "u", tier=2)
+    first = calls["n"]
+    with pytest.raises(RuntimeError, match="injoignable"):
+        await llm.complete("m", "s", "u", tier=2)
+    assert first == 2 and calls["n"] == 2          # second call fails instantly, no network attempt
+    await llm.close()

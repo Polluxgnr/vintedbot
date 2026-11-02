@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import json
 import logging
 import re
@@ -95,6 +96,7 @@ class LLM:
         self._record = record_usage
         self._http = httpx.AsyncClient(timeout=90)
         self._sem = asyncio.Semaphore(4)
+        self._down_until = 0.0                     # circuit breaker when the network can't reach OpenRouter
 
     @property
     def enabled(self) -> bool:
@@ -122,6 +124,9 @@ class LLM:
     ) -> LLMResult:
         if not self.enabled:
             raise RuntimeError("OPENROUTER_API_KEY manquante")
+        if time.monotonic() < self._down_until:
+            # Network can't reach OpenRouter: fail fast instead of making every search wait on retries.
+            raise RuntimeError(f"IA injoignable (réessai dans {int(self._down_until - time.monotonic())} s)")
         payload = {
             "model": model,
             "models": [model, *[m for m in self.fallbacks if m != model]],  # OpenRouter-side failover
@@ -135,6 +140,8 @@ class LLM:
         }
         headers = {"Authorization": f"Bearer {self.api_key}", "X-Title": "Vinted Hunter"}
 
+        body: dict | None = None
+        network_failures = 0
         async with self._sem:
             for attempt in range(3):
                 try:
@@ -146,10 +153,19 @@ class LLM:
                     body = resp.json()
                     break
                 except httpx.TransportError as exc:
-                    log.warning("OpenRouter transport error: %s", exc)
-                    await asyncio.sleep(2 * (attempt + 1))
-            else:
-                raise RuntimeError("OpenRouter indisponible")
+                    network_failures += 1
+                    log.warning("OpenRouter transport error: %s %s", type(exc).__name__, exc)
+                    if network_failures >= 2:
+                        break                      # the link is down: stop retrying
+                    await asyncio.sleep(2)
+        if body is None:
+            if network_failures >= 2:
+                # Circuit breaker: every search would otherwise wait on doomed retries.
+                self._down_until = time.monotonic() + 300
+                log.warning("OpenRouter unreachable: AI paused for 5 min, free tiers keep running")
+                raise RuntimeError("IA injoignable depuis ce réseau (pause 5 min)")
+            raise RuntimeError("OpenRouter indisponible")
+        self._down_until = 0.0
 
         if "error" in body:
             raise RuntimeError(f"OpenRouter: {body['error']}")

@@ -101,3 +101,40 @@ def test_missing_specs_block_pepite_and_verification_scores():
     deal = build_deal(l, estimate(Condition.VERY_GOOD, reference=280), apple, rs)
     assert any(f.startswith("specs à vérifier") for f in gate_fails(deal, apple, rs, require_market=False))
     assert deal.score_parts["vérification Vinted dispo"] == 5
+
+
+def test_id_clock_estimates_listing_age():
+    from datetime import datetime, timedelta, timezone
+    from vinted_hunter.engine import Hunter
+    h = Hunter.__new__(Hunter)
+    h._clock = []
+    t0 = datetime(2026, 11, 2, 12, tzinfo=timezone.utc)
+    for k in range(30):                                  # ids grow ~1000 per minute
+        h._clock_add(10_000_000 + k * 1000, t0 + timedelta(minutes=k))
+    est = h._clock_estimate(10_015_500)
+    assert abs((est - (t0 + timedelta(minutes=15.5))).total_seconds()) < 1
+    assert h._clock_estimate(1) is not None              # extrapolates below the range
+
+
+def test_scam_network_detection():
+    from vinted_hunter.engine import Hunter
+    from vinted_hunter.models import Seller
+    ring = []
+    for i in range(5):
+        l = make(f"Valve Steam Deck Oled 512gb Black Handheld {i}", 250, id=100 + i,
+                 model_key="consoles:steamdeck_oled", details_loaded=i < 3)
+        ring.append(l.model_copy(update={"seller": Seller(id=i + 1, reviews=0 if i < 3 else None)}))
+    honest = make("Steam Deck OLED 512", 420, id=200, model_key="consoles:steamdeck_oled", details_loaded=True)
+    flagged = Hunter._scam_networks(ring + [honest])
+    assert set(flagged) == {100, 101, 102, 103, 104} and 200 not in flagged
+    assert "réseau d'arnaque" in flagged[100]
+
+
+def test_relists_collapse_to_one_card():
+    from vinted_hunter.bot.app import _dedupe_relists
+    from types import SimpleNamespace
+    a = make("Steam deck OLED 512GB", 400, id=1, model_key="consoles:steam_deck_oled")
+    b = make("Steam Deck OLED 512gb", 400, id=2, model_key="consoles:steam_deck_oled")
+    c = make("Steam Deck OLED", 380, id=3, model_key="consoles:steam_deck_oled")
+    deals = [SimpleNamespace(listing=l) for l in (a, b, c)]
+    assert [d.listing.id for d in _dedupe_relists(deals)] == [1, 3]

@@ -118,6 +118,7 @@ class Niche(BaseModel):
     vinted_verification: str | None = None   # "electronics" | "authenticity": Vinted's optional paid check
     verification_min_price: float = 0
     required_specs: list[str] = Field(default_factory=list)   # specs that change the price (storage, cpu...)
+    feed_catalogs: list[int] = Field(default_factory=list)    # Vinted categories watched newest-first (sniper feed)
     enabled_by_default: bool = False
 
     @cached_property

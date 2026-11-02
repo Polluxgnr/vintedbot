@@ -115,6 +115,7 @@ class Listing(BaseModel):
     model_key: str | None = None
     model_name: str | None = None
     details_loaded: bool = False
+    scam_hint: str | None = None       # set by cross-listing checks (e.g. a network of identical listings)
 
     @property
     def age_minutes(self) -> float | None:

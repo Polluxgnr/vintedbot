@@ -138,6 +138,7 @@ niches:
       - {key: carhartt_og_active, name: Carhartt WIP OG Active / Arctic, match: ['carhartt.*(?:og active|arctic)'], resale: 110}
 
   apple_tech:
+    feed_catalogs: [3661, 3580, 3678]
     vinted_verification: electronics
     verification_min_price: 50
     required_specs: [storage]
@@ -192,6 +193,7 @@ niches:
       - {key: watch_s8, name: Apple Watch Series 8-10 / Ultra, match: ['apple watch.*(series (?:8|9|10)|ultra)'], resale: 230, new: 449, generic: true}
 
   consoles:
+    feed_catalogs: [3025]
     vinted_verification: electronics
     verification_min_price: 50
     name: "Consoles récentes"
@@ -242,6 +244,7 @@ niches:
       - {key: quest3, name: Meta Quest 3, match: ['quest 3\b'], exclude: ['3s'], resale: 360, new: 549}
 
   retro_gaming:
+    feed_catalogs: [3025, 3026]
     vinted_verification: electronics
     verification_min_price: 50
     name: "Retro gaming"
@@ -281,6 +284,7 @@ niches:
       - {key: pkmn_gba, name: Pokémon Rubis/Saphir/Rouge Feu/Vert Feuille, match: ['pokemon (?:rubis|saphir|rouge feu|vert feuille)'], resale: 60, generic: true}
 
   pokemon_tcg:
+    feed_catalogs: [4874]
     name: "Cartes Pokémon & TCG"
     emoji: "⚡"
     description: "Lots de cartes, classeurs, ETB/displays scellés - les parents vendent les classeurs des enfants au kilo."
@@ -309,6 +313,7 @@ niches:
       - {key: onepiece_lot, name: Lot One Piece Card Game, match: ['one piece.*(?:card|carte)'], resale: 40, generic: true}
 
   lego:
+    feed_catalogs: [1767]
     name: "LEGO"
     emoji: "🧱"
     description: "Sets complets, séries retirées, lots en vrac au kilo, minifigs."
@@ -333,6 +338,7 @@ niches:
       - {key: lego_minifig, name: Lot minifigs LEGO, match: ['minifig'], resale: 35, generic: true}
 
   film_cameras:
+    feed_catalogs: [3076]
     name: "Appareils argentiques"
     emoji: "📷"
     description: "Compacts et reflex argentiques - Mju II, T2, AE-1 : la tendance TikTok fait exploser les prix."
@@ -367,6 +373,7 @@ niches:
       - {key: canon_prima, name: Canon Prima / Sure Shot, match: ['canon (?:prima|sure shot)'], resale: 70, generic: true}
 
   digital_cameras:
+    feed_catalogs: [3060]
     vinted_verification: electronics
     verification_min_price: 50
     name: "Photo numérique"
@@ -409,6 +416,7 @@ niches:
       - {key: kindle_pw, name: Kindle Paperwhite / Oasis, match: ['kindle (?:paperwhite|oasis)'], resale: 80, generic: true}
 
   audio:
+    feed_catalogs: [3678]
     vinted_verification: electronics
     verification_min_price: 50
     name: "Audio & hi-fi"
@@ -475,6 +483,7 @@ niches:
       - {key: longines, name: Longines, match: ['\blongines\b'], resale: 500, generic: true}
 
   home_premium:
+    feed_catalogs: [3474]
     name: "Maison premium"
     emoji: "🏠"
     description: "Dyson, Thermomix, Le Creuset, KitchenAid, Smeg - les déménagements créent des affaires."
@@ -563,6 +572,7 @@ niches:
       - {key: shirt_vintage, name: Maillot vintage (générique), match: ['maillot.*(?:vintage|retro|199\d|200[0-6])'], resale: 55, generic: true}
 
   mini_pc_homelab:
+    feed_catalogs: [3581]
     vinted_verification: electronics
     verification_min_price: 50
     required_specs: [cpu,ram,storage]
@@ -603,6 +613,7 @@ niches:
       - {key: synology, name: NAS Synology (DS2xx+/DS9xx+), match: ['synology'], resale: 220, generic: true}
 
   pc_hardware:
+    feed_catalogs: [3582, 3599, 3580]
     vinted_verification: electronics
     verification_min_price: 50
     required_specs: [cpu,ram,storage]
@@ -646,6 +657,7 @@ niches:
       - {key: xps13, name: Dell XPS 13/15, match: ['\bxps ?1[35]\b'], resale: 420, generic: true}
 
   smartphones:
+    feed_catalogs: [3661]
     vinted_verification: electronics
     verification_min_price: 50
     required_specs: [storage]

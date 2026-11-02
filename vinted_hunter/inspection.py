@@ -149,6 +149,8 @@ def inspect_listing(listing: Listing, niche: Niche | None) -> Inspection:
         seen_pos.discard("complet")
     findings += list(worst.values())
     findings += [Finding(kind="positive", label=p) for p in sorted(seen_pos)]
+    if listing.scam_hint:
+        scams.add(listing.scam_hint)
     findings += [Finding(kind="scam", label=s) for s in sorted(scams)]
     specs = extract_specs(text)
     needed = list(niche.required_specs) if niche else []
@@ -216,6 +218,10 @@ def assess_seller(listing: Listing, insp: Inspection, valuation: Valuation) -> S
     if valuation.fair_value and listing.price < valuation.fair_value * 0.35:
         score -= 0.2
         reasons.append("prix trop beau pour être vrai")
+    elif valuation.fair_value and s.reviews == 0 and listing.price < valuation.fair_value * 0.55:
+        # The most common Vinted scam: a review-less account selling a coveted item at half price.
+        score -= 0.25
+        reasons.append("compte sans avis + prix cassé")
     if len(listing.photos) <= 1:
         score -= 0.1
         reasons.append("une seule photo")

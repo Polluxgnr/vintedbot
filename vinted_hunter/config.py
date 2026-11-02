@@ -73,7 +73,7 @@ class RuntimeSettings(BaseModel):
     min_margin_pct: float = 40.0
     min_discount_pct: float = 35.0     # price at least 35 % under the estimated value
     min_confidence: float = 0.6
-    min_score: int = 70
+    min_score: int = 55
     ai_daily_budget_usd: float = 1.5
     auto_deep: bool = True             # run the expensive tier automatically on exceptional deals
     deep_min_profit_eur: float = 40.0

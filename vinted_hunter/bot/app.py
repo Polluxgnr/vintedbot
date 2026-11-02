@@ -52,6 +52,18 @@ HUNT_STAGES = [("🔎", "Recherche sur Vinted"), ("🧮", "Filtres, cote & tri")
 _FRACTION = re.compile(r"(\d+)\s*/\s*(\d+)")
 
 
+def _dedupe_relists(deals: list) -> list:
+    """A seller who relists the same item at the same price is one deal, not two cards."""
+    seen: set[tuple] = set()
+    out = []
+    for d in deals:
+        key = (d.listing.seller.id or d.listing.id, d.listing.model_key, round(d.listing.price))
+        if key not in seen:
+            seen.add(key)
+            out.append(d)
+    return out
+
+
 class Progress:
     """A live loading screen: one message, edited in place, showing every step as a checklist.
 
@@ -355,10 +367,13 @@ class HunterBot:
         min_profit = spec.min_profit or 0
         pepites = [d for d in deals if d.pepite]
         floor = max(15.0, min_profit * 0.5)
+        suspicious = [d for d in deals if (d.inspection and d.inspection.scams)
+                      or (d.seller_check and d.seller_check.level == "risque")]
+        sus_ids = {d.listing.id for d in suspicious}
         good = pepites + [d for d in deals if not d.pepite and d.profit is not None and d.margin_pct is not None
-                          and (personal or (d.profit >= floor and d.margin_pct >= 10))
-                          and not (d.inspection and d.inspection.scams)]
-        shown = (good or deals[:3])[:20]
+                          and (personal or (d.profit >= floor and d.margin_pct >= 10)) and d.listing.id not in sus_ids]
+        good = _dedupe_relists(good)
+        shown = (good or _dedupe_relists([d for d in deals if d.listing.id not in sus_ids])[:3])[:20]
         summary = f"✅ Chasse terminée : <b>{v.e(spec.describe())}</b>\n"
         if niche:
             summary += f"Niche : {v.e(niche.label)}\n"
@@ -372,6 +387,12 @@ class HunterBot:
         else:
             summary += ("Rien de rentable pour l'instant (les prix sont au niveau du marché). Voici les 3 plus proches 👇 "
                         "— active une alerte : je te préviens dès qu'une vraie affaire apparaît.")
+        if suspicious:
+            rings = {d.inspection.scams[0] for d in suspicious if d.inspection and d.inspection.scams
+                     and d.inspection.scams[0].startswith("réseau")}
+            summary += f"\n🛡 <b>{len(suspicious)} annonce(s) suspecte(s) écartée(s)</b>"
+            if rings:
+                summary += f" — {v.e(next(iter(rings)))}"
         if self.hunter.ai_notice:
             summary += f"\n<i>ℹ️ {v.e(self.hunter.ai_notice)}</i>"
         summary += f"\n<i>⏱ {time.monotonic() - progress.started:.0f} s · {self.sv.vinted.requests_made} requêtes Vinted</i>"
