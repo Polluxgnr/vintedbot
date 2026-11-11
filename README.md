@@ -82,7 +82,7 @@ Every card says what blocked it (🚫), and 🔍 *Détail du calcul* shows each 
 
 ## Sales database
 
-Vinted doesn't publish sales, so the bot tracks identified listings and re-checks them (6 every 10 min) to see whether they sold, were reserved, disappeared or dropped in price. This gives, per model:
+Vinted doesn't publish sales, so the bot tracks identified listings and re-checks them (12 every 10 min, also between niche watches so it is never starved) to see whether they sold, were reserved or dropped in price. A sold item answers **404** to visitors who are not logged in, so a listing that disappears counts as a sale. This gives, per model:
 - **Real sale prices,** the strongest source in the price estimate.
 - **Median days-to-sell,** shown as ⚡ on cards and used as a liquidity bonus in the score.
 - **Sell-through rate.**

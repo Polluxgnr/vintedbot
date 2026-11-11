@@ -30,6 +30,7 @@ class Services:
     async def close(self) -> None:
         await self.vinted.close()
         await self.llm.close()
+        await self.hunter.translator.close()
         await self.db.close()
 
 

@@ -42,10 +42,10 @@ async def test_sales_stats(tmp_path):
         await db.update_tracking(1, "sold", 190)
         await db.update_tracking(2, "gone", None)
         s = await db.sales("consoles:switch_oled")
-        assert (s["tracked"], s["sold"], s["gone"], s["active"]) == (6, 2, 1, 3)
+        assert (s["tracked"], s["sold"], s["gone"], s["active"]) == (6, 3, 1, 3)   # gone = sold (404 once sold)
         assert s["median_days"] == pytest.approx(4, abs=0.1)
-        assert s["sell_through"] == pytest.approx(2.5 / 6, abs=0.01)
-        assert sorted(p for p, _ in s["prices"]) == [180, 190]
+        assert s["sell_through"] == pytest.approx(3 / 6, abs=0.01)
+        assert sorted(p for p, _ in s["prices"]) == [180, 190, 200]
         assert (await db.tracking_totals())["sold"] == 2
     finally:
         await db.close()
@@ -104,3 +104,28 @@ async def test_vinted_stops_on_first_429_and_caps_hourly():
     assert calls["n"] == 2                             # paused: no network at all
     assert c.requests_last_hour == 2 and c.has_budget(1.0) is False   # circuit open => no background budget
     await c.close()
+
+
+async def test_cheapest_first_search_keeps_the_query():
+    import httpx
+    from vinted_hunter.models import SearchSpec
+    from vinted_hunter.vinted.client import VintedClient
+
+    seen = {}
+
+    def handler(request):
+        seen["order"] = request.url.params.get("order")
+        return httpx.Response(200, text="")
+
+    c = VintedClient("www.vinted.fr", min_interval=0)
+    c._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    await c.search(SearchSpec(query="carhartt detroit"), order="price_low_to_high")
+    assert seen["order"] == "relevance"
+    await c.close()
+
+
+def test_irrelevant_results_are_detected():
+    from vinted_hunter.vinted.client import _relevant
+    junk = [make(t, 1) for t in ["Jean Jules skinny", "Set camicie", "Polo fila", "Top shein"] * 5]
+    good = [make(t, 90) for t in ["Carhartt Detroit jacket", "Veste Carhartt", "Detroit WIP"] * 5]
+    assert not _relevant("Carhartt Detroit jacket", junk) and _relevant("Carhartt Detroit jacket", good)

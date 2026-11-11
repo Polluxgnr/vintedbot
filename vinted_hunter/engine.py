@@ -245,7 +245,10 @@ class Hunter:
             log.warning("%s - continuing with free tiers only", exc)
         except Exception as exc:    # AI must never break the hunt
             self.ai_notice = f"Erreur IA: {exc}"
-            log.exception("AI tier failed")
+            if "injoignable" in str(exc) or "indisponible" in str(exc):
+                log.warning("AI tier skipped: %s", exc)        # network outage: one line, not a traceback
+            else:
+                log.exception("AI tier failed")
 
         return await self._finalize(enriched, verdicts, niche, spec, rs, deals, pool, analysed_only=mode == "hunt")
 
@@ -352,7 +355,7 @@ class Hunter:
             return self._gate(deal, niche, rs, spec)
         query = ref.name.split("(")[0].split("/")[0].strip()
         found: dict[int, Listing] = {}
-        for order in ("price_low_to_high",):
+        for order in ("relevance",):          # cheapest identical listings are ranked locally below
             try:
                 for l in await self.vinted.search(SearchSpec(query=query), order=order):
                     found.setdefault(l.id, l)
@@ -692,8 +695,9 @@ class Hunter:
         """Endless crawl plan over EVERY niche and model: cheapest first (where mispricings are), then relevance,
         then deeper pages. Only feeds the database (prices, sales tracking) - no AI, no alerts."""
         while True:
-            for order, page in (("price_low_to_high", 1), ("relevance", 1), ("relevance", 2), ("newest_first", 2),
-                                ("price_low_to_high", 2), ("relevance", 3)):
+            # No "price_low_to_high": Vinted ignores the search text with that sort (it would crawl junk).
+            for order, page in (("relevance", 1), ("newest_first", 1), ("relevance", 2), ("newest_first", 2),
+                                ("relevance", 3), ("price_high_to_low", 1)):
                 for niche in self.niches:
                     for query in niche.search_queries:
                         yield niche, query, order, page
@@ -746,6 +750,17 @@ class Hunter:
                         log.info("price drop turned %s into a pépite", listing.id)
         return changed
 
+    async def _maybe_track(self, notify: Notify) -> None:
+        """Sales database: 12 item checks every 10 min (~20 % of the hourly request cap)."""
+        if time.monotonic() - self._last_tracker <= 600:
+            return
+        self._last_tracker = time.monotonic()
+        try:
+            n = await self.run_tracker(notify, batch=12)
+            log.info("sales tracker: 12 checked, %s changed status", n)
+        except Exception:
+            log.exception("sales tracker failed")
+
     async def run_forever(self, notify: Notify) -> None:
         log.info("Watch loop started")
         while True:
@@ -764,13 +779,7 @@ class Hunter:
                     log.info("price calibration: %s models updated", await self.db.calibrate())
                 except Exception:
                     log.exception("calibration failed")
-            if time.monotonic() - self._last_tracker > 600:     # sales database: 6 checks / 10 min
-                self._last_tracker = time.monotonic()
-                try:
-                    if n := await self.run_tracker(notify):
-                        log.info("sales tracker: %s listing(s) changed status", n)
-                except Exception:
-                    log.exception("sales tracker failed")
+            await self._maybe_track(notify)
             ran_watch = False
             try:
                 for w in await self.db.watches(active_only=True):
@@ -779,6 +788,7 @@ class Hunter:
                     if time.monotonic() - self._last_run.get(w["id"], 0) < self._interval(w["id"]):
                         continue
                     self._last_run[w["id"]] = time.monotonic()
+                    await self._maybe_track(notify)          # a full pass over 19 niches is long: don't starve it
                     ran_watch = True
                     try:
                         before = await self._radar_count()

@@ -240,3 +240,29 @@ def test_ages_and_confidence_are_not_falsely_precise():
 def test_retro_games_keep_their_own_models(title, key):
     m = CATALOG.get("retro_gaming").identify(title)
     assert (m.key if m else None) == key
+
+
+@pytest.mark.parametrize("niche,title,key", [
+    ("luxury", "Original LV Clutch Aus Neverfull Tasche", "lv_neverfull_pochette"),
+    ("luxury", "Sac Louis Vuitton Neverfull MM", "lv_neverfull"),
+    ("luxury", "Portafoglio Goyard", None),
+    ("luxury", "Gucci marmont slippers Pink 37,5", None),
+    ("luxury", "Cintura Gucci marmont", "gucci_belt"),
+    ("luxury", "Sac Gucci Marmont small matelassé", "gucci_marmont"),
+    ("luxury", "Sneakers Prada Montecarlo Re-Edition 2005", None),
+    ("home_premium", "Dyson V15 Zubehör", None),
+    ("home_premium", "Accessoire râpe neuf kitchenaid", None),
+    ("home_premium", "KitchenAid Artisan 5KSM175 rouge", "kitchenaid"),
+    ("watches", "Swatch x Omega Mission On Earth", "moonswatch"),
+    ("watches", "Omega Seamaster 300", "omega"),
+])
+def test_other_product_types_are_not_the_flagship(niche, title, key):
+    m = CATALOG.get(niche).identify(title)
+    assert (m.key if m else None) == key
+
+
+def test_lego_instructions_alone_are_excluded():
+    from vinted_hunter.niches import normalize
+    lego = CATALOG.get("lego")
+    assert lego.excluded_by(normalize("Istruzioni Lego Star Wars UCS Millenium Falcon"))
+    assert not lego.excluded_by(normalize("set lego 75417 ucs non scellé vendu avec manuel et figurine"))

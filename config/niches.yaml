@@ -330,7 +330,10 @@ niches:
     collectible: true
     components: [{name: notice, match: 'notices?', share: 0.08}, {name: minifigs, match: 'minifig\w*|personnages?|figurines?', share: 0.2}, {name: boîte, match: 'boite', share: 0.1}, {name: pièces, match: 'pieces?', share: 0.15}]
     alone: []
-    exclude: ['\blepin\b', '\blele\b', '\bmould king\b', '\bcompatible\b', '\bpas lego\b', '\bduplo\b', '\bnotice seule\b', '\bboite vide\b']
+    exclude: ['\blepin\b', '\blele\b', '\bmould king\b', '\bcompatible\b', '\bpas lego\b', '\bduplo\b', '\bnotice seule\b', '\bboite vide\b',
+              '^(?:istruzioni|instructions?|notices?|manuel|bauanleitung|anleitung|instrucciones|handleiding)\b',
+              '\b(?:istruzioni|instructions?|notices?|bauanleitung|instrucciones) (?:seule?s?|only|solo|nur|uniquement)\b',
+              '\b(?:light kit|kit (?:d )?eclairage|led kit|beleuchtung|vitrine|display case|plexi\w*|stickers? seuls?|minifig\w* seule?s?)\b']
     red_flags: [marques compatibles (Lepin, Mould King) présentées comme LEGO, set "complet" sans notices ni photo de toutes les pièces]
     vision_checklist: [logo LEGO sur les tenons, minifigs présentes, boîte scellée (scotch rond d'origine), jaunissement des pièces blanches]
     ai_hints: "Le vrac se revend ~10-15€/kg, plus si minifigs. Les sets retirés (UCS, Modular, Ideas) prennent 30-80% après retrait."
@@ -547,7 +550,8 @@ niches:
       - {key: gshock, name: Casio G-Shock, match: ['g ?shock'], resale: 70, new: 120, generic: true}
       - {key: casio_vintage, name: Casio vintage (A168, F91...), match: ['casio.*(?:a168|f91|a158|vintage|ae1200)'], resale: 25, generic: true}
       - {key: tissot_prx, name: Tissot PRX, match: ['tissot prx'], resale: 260, new: 450}
-      - {key: omega, name: Omega, match: ['\bomega\b'], resale: 900, generic: true}
+      - {key: moonswatch, name: Swatch x Omega MoonSwatch, match: ['moon ?swatch|swatch.*omega|omega.*swatch|mission (?:to|on) (?:the )?(?:moon|earth|mars|mercury|venus|jupiter|saturn|uranus|neptune|pluto|sun)'], resale: 220, new: 285}
+      - {key: omega, name: Omega, match: ['\bomega\b'], exclude: ['swatch'], resale: 900, generic: true}
       - {key: longines, name: Longines, match: ['\blongines\b'], resale: 500, generic: true}
 
   home_premium:
@@ -564,6 +568,8 @@ niches:
     collectible: false
     model_guard:
       - '\b(?:accessoires? seuls?|embout|brosse|filtre|batterie seule|support mural|pieces?)\b'
+      # Accessories named after the machine, in every language (Dyson V15 Zubehör, râpe KitchenAid...)
+      - '^(?!.*(?:avec|with|\+|complet\w*|komplett|completo|inclus\w*|mit\b)).*\b(?:zubehor|ersatzteil\w*|aufsatz|accessoires?|accessori|accesorios?|accessory|accessories|rape|grater|trancheuse|hachoir|fouet|crochet|batteur|bol seul|bowl|couvercle|deckel|tete|aufsatze|attachments?|duse|buse|chargeur|ladegerat|caricatore|tube|rohr|wandhalterung|station de charge|sac|beutel)\b'
     components: [{name: accessoires/embouts, match: 'accessoires|embouts|brosses|tetes|suceurs?', share: 0.18}, {name: batterie, match: 'batterie', share: 0.3}, {name: chargeur, match: 'chargeur|cable', share: 0.07}, {name: Cook-Key, match: 'cook ?key', share: 0.1}, {name: boîte, match: 'boite', share: 0.03}]
     alone: []
     exclude: ['\baccessoires? seuls?\b', '\bfiltre seul\b', '\bbatterie seule\b', '\bembout seul\b', '\bbrosse seule\b', '\bcouvercle seul\b']
@@ -600,21 +606,25 @@ niches:
     vision_checklist: [date code / numéro de série, alignement du monogramme, coutures (nombre et régularité), quincaillerie gravée, intérieur et étiquette made in]
     ai_hints: "Sois extrêmement sceptique. Ne recommande BUY que si les photos montrent les points d'authentification clés. Longchamp Le Pliage et foulards Hermès vintage sont les meilleures opportunités réelles."
     models:
-      - {key: lv_speedy, name: Louis Vuitton Speedy, match: ['speedy'], resale: 550, new: 1650}
-      - {key: lv_neverfull, name: Louis Vuitton Neverfull, match: ['neverfull'], resale: 900, new: 2100}
+      # Bag models: a pouch, wallet, belt, shoe or garment of the same line is not the bag (LV Neverfull pochette,
+      # Gucci Marmont belt, Prada Re-Edition sneakers...).
+      - {key: lv_speedy, name: Louis Vuitton Speedy, match: ['speedy'], resale: 550, new: 1650, exclude: &not_bag ['pochette|pouch|clutch|interna|interne|insert|organi[sz]er|wallet|portefeuille|portafoglio|cartera|geldborse|porte ?monnaie|porte ?cles?|portachiavi|key ?(?:holder|ring|chain)|keychain|charm|bijou de sac|ceinture|\bbelt|cintura|gurtel|cinturon|chaussures?|shoes?|sneakers?|baskets?|slippers?|mules?|escarpins?|decollete|loafers?|mocassins?|sandal\w*|boots?|bottes|bottines|lunettes|sunglasses|occhiali|foulard|scarf|sciarpa|sangle seule|strap only|dust ?bag seul|boite seule|empty box|cadenas|\block\b|card ?holder|porte ?cartes?|portacarte|bracelet|collier|necklace|bague|\bring\b|parfum|perfume|t ?shirt|\btee\b|pull|sweat|hoodie|veste|jacket|casquette|\bcap\b|chapeau|bonnet|pantalon|jupe|robe|toiletry|trousse']}
+      - {key: lv_neverfull, name: Louis Vuitton Neverfull, match: ['neverfull'], resale: 900, new: 2100, exclude: *not_bag}
+      - {key: lv_neverfull_pochette, name: LV pochette de Neverfull, match: ['neverfull.*(?:pochette|clutch|pouch|interna)|(?:pochette|clutch|pouch|interna).*neverfull'], resale: 260}
+      - {key: gucci_belt, name: Ceinture Gucci (GG / Marmont), match: ['gucci.*(?:ceinture|belt|cintura|gurtel|cinturon)|(?:ceinture|belt|cintura|gurtel|cinturon).*gucci'], resale: 220, new: 450}
       - {key: lv_pochette, name: LV Pochette Accessoires/Métis, match: ['louis vuitton.*pochette|pochette (?:metis|accessoires)'], resale: 600, new: 1300, generic: true}
       - {key: hermes_carre, name: Carré Hermès 90, match: ['(?:carre|foulard).*hermes|hermes.*(?:carre|foulard)'], resale: 230, new: 520}
       - {key: hermes_belt, name: Ceinture Hermès H, match: ['ceinture.*hermes|hermes.*ceinture'], resale: 450, new: 950}
       - {key: longchamp_pliage, name: Longchamp Le Pliage, match: ['pliage'], resale: 60, new: 145}
-      - {key: lv_alma, name: Louis Vuitton Alma, match: ['\balma\b'], resale: 650, new: 1850}
-      - {key: lv_keepall, name: Louis Vuitton Keepall, match: ['keepall'], resale: 750, new: 2300}
-      - {key: dior_saddle, name: Dior Saddle, match: ['dior.*saddle|saddle.*dior'], resale: 1700, new: 4100}
-      - {key: goyard_stlouis, name: Goyard Saint-Louis/Artois, match: ['goyard'], resale: 900, generic: true}
-      - {key: hermes_evelyne, name: Hermès Evelyne, match: ['evelyne'], resale: 1300, new: 2900}
-      - {key: prada_reedition, name: Prada Re-Edition, match: ['re ?edition'], resale: 650, new: 1600}
-      - {key: gucci_marmont, name: Gucci GG Marmont, match: ['marmont'], resale: 700, new: 1900}
-      - {key: celine_triomphe, name: Celine Triomphe, match: ['celine.*triomphe|triomphe.*celine'], resale: 1300, new: 3400}
-      - {key: chanel_flap, name: Chanel Classic/Timeless Flap, match: ['chanel.*(?:timeless|classique|classic|flap|11 ?12|2 ?55)'], resale: 4500, new: 10400}
+      - {key: lv_alma, name: Louis Vuitton Alma, match: ['\balma\b'], resale: 650, new: 1850, exclude: *not_bag}
+      - {key: lv_keepall, name: Louis Vuitton Keepall, match: ['keepall'], resale: 750, new: 2300, exclude: *not_bag}
+      - {key: dior_saddle, name: Dior Saddle, match: ['dior.*saddle|saddle.*dior'], resale: 1700, new: 4100, exclude: *not_bag}
+      - {key: goyard_stlouis, name: Goyard Saint-Louis/Artois, match: ['goyard'], resale: 900, generic: true, exclude: *not_bag}
+      - {key: hermes_evelyne, name: Hermès Evelyne, match: ['evelyne'], resale: 1300, new: 2900, exclude: *not_bag}
+      - {key: prada_reedition, name: Prada Re-Edition, match: ['re ?edition'], resale: 650, new: 1600, exclude: *not_bag}
+      - {key: gucci_marmont, name: Gucci GG Marmont, match: ['marmont'], resale: 700, new: 1900, exclude: *not_bag}
+      - {key: celine_triomphe, name: Celine Triomphe, match: ['celine.*triomphe|triomphe.*celine'], resale: 1300, new: 3400, exclude: *not_bag}
+      - {key: chanel_flap, name: Chanel Classic/Timeless Flap, match: ['chanel.*(?:timeless|classique|classic|flap|11 ?12|2 ?55)'], resale: 4500, new: 10400, exclude: *not_bag}
       - {key: rayban, name: Ray-Ban (Wayfarer/Aviator), match: ['ray ?ban'], resale: 60, new: 179, generic: true}
 
   football_shirts:

@@ -202,18 +202,21 @@ class Database:
         await self.conn.commit()
 
     async def sales(self, model_key: str, days: int = 90) -> dict[str, Any]:
-        """Real sales of a model: prices, days-to-sell, sell-through. 'gone' counts half (sold OR deleted)."""
+        """Real sales of a model: prices, days-to-sell, sell-through.
+
+        Vinted answers 404 to anonymous visitors once an item is sold, so 'gone' is counted as a sale (it can
+        also be a deletion; the error is small next to ignoring every sale)."""
         since = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         rows = await self._all(
             "SELECT status, last_price, condition, first_seen, closed_at FROM tracking "
             "WHERE model_key=? AND first_seen>=?", (model_key, since))
-        sold = [r for r in rows if r["status"] == "sold"]
+        sold = [r for r in rows if r["status"] in ("sold", "gone")]
         gone = [r for r in rows if r["status"] == "gone"]
         active = [r for r in rows if r["status"] in ("active", "reserved")]
         days_to_sell = sorted(
             (datetime.fromisoformat(r["closed_at"]) - datetime.fromisoformat(r["first_seen"])).total_seconds() / 86400
             for r in sold if r["closed_at"])
-        closed = len(sold) + 0.5 * len(gone)
+        closed = len(sold)
         return {
             "tracked": len(rows), "sold": len(sold), "gone": len(gone), "active": len(active),
             "prices": [(r["last_price"], Condition.parse(r["condition"])) for r in sold],
@@ -298,7 +301,7 @@ class Database:
         return await self._all(
             """SELECT model_key, COUNT(*) AS sold,
                       AVG(julianday(closed_at) - julianday(first_seen)) AS days, AVG(last_price) AS price
-               FROM tracking WHERE status='sold' AND closed_at IS NOT NULL
+               FROM tracking WHERE status IN ('sold','gone') AND closed_at IS NOT NULL
                GROUP BY model_key HAVING sold >= 2 ORDER BY sold DESC, days ASC LIMIT ?""", (limit,))
 
     async def relabel_model(self, listing_id: int, model_key: str) -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import re
 import time
 from collections import deque
 from typing import Any
@@ -28,6 +29,15 @@ _HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8",
 }
+
+
+def _relevant(query: str, listings: list[Listing]) -> bool:
+    """At least 1 result in 5 shares a word of the query: otherwise Vinted answered something else."""
+    words = {w for w in re.findall(r"[a-z0-9]{3,}", query.lower())}
+    if not words:
+        return True
+    hits = sum(1 for l in listings if words & set(re.findall(r"[a-z0-9]{3,}", f"{l.title} {l.brand or ''}".lower())))
+    return hits >= len(listings) / 5
 
 
 class VintedUnavailable(RuntimeError):
@@ -98,7 +108,10 @@ class VintedClient:
         if self.circuit_open:
             raise VintedUnavailable(f"Vinted en pause ({self.cooldown_remaining}s)")
         if not self._session_ready:
-            await self._bootstrap()
+            try:
+                await self._bootstrap()
+            except httpx.TransportError as exc:          # no network / DNS down: a pause, not a crash
+                raise VintedUnavailable(f"Vinted injoignable (réseau : {type(exc).__name__})") from exc
 
         for attempt in range(retries):
             await self._throttle()
@@ -151,6 +164,11 @@ class VintedClient:
     async def search(self, spec: SearchSpec, *, page: int = 1, per_page: int = 96,
                      order: str = "newest_first") -> list[Listing]:
         """One catalog page (~46 listings). `per_page` is kept for API compatibility."""
+        cheapest_first = order == "price_low_to_high" and bool(spec.query)
+        if cheapest_first:
+            # Vinted ignores search_text when sorting by ascending price (it returns random 1 € items from the
+            # whole catalog). Ask for the relevant listings and sort them ourselves.
+            order = "relevance"
         params: list[tuple[str, Any]] = [("search_text", spec.query), ("order", order)]
         if page > 1:
             params.append(("page", page))
@@ -164,7 +182,11 @@ class VintedClient:
         if spec.price_min or spec.price_max:
             params.append(("currency", "EUR"))
         page_html = await self._get("/catalog", params, as_json=False)
-        return parse_catalog_html(page_html, self.domain) if page_html else []
+        listings = parse_catalog_html(page_html, self.domain) if page_html else []
+        if spec.query and len(listings) >= 10 and not _relevant(spec.query, listings):
+            log.warning("Vinted ignored the search text %r (order=%s): results discarded", spec.query, order)
+            return []
+        return sorted(listings, key=lambda l: l.price) if cheapest_first else listings
 
     async def enrich(self, listing: Listing) -> Listing:
         """Load full description, every photo and the seller's rating from the item page."""
