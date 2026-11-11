@@ -266,3 +266,17 @@ def test_lego_instructions_alone_are_excluded():
     lego = CATALOG.get("lego")
     assert lego.excluded_by(normalize("Istruzioni Lego Star Wars UCS Millenium Falcon"))
     assert not lego.excluded_by(normalize("set lego 75417 ucs non scellé vendu avec manuel et figurine"))
+
+
+@pytest.mark.parametrize("niche,title,key", [
+    ("consoles", "Cartão 512GB Lexar com Batocera para Steam Deck", None),
+    ("consoles", "Steam Deck LCD 512 Go", "steamdeck"),
+    ("luxury", "Livre Carrés d’Art Hermès Geneviève Fontan", None),
+    ("watches", "Omega Black Alligator Leather bracelet & Original Clasp - 20 mm", None),
+    ("watches", "Montre Omega Seamaster bracelet acier", "omega"),
+    ("luxury", "Gucci GG Marmont Halskette mit Anhänger", None),
+    ("audio", "Devialet Gemini II Opéra de Paris", "devialet_gemini"),
+])
+def test_accessories_books_jewellery_are_not_the_product(niche, title, key):
+    m = CATALOG.get(niche).identify(title)
+    assert (m.key if m else None) == key

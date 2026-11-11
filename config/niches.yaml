@@ -233,7 +233,7 @@ niches:
       - {key: ps5_disc, name: PS5 lecteur (fat), match: ['(?:ps ?5|playstation 5).*(?:lecteur|disque|disc|disk|standard|blu ?ray)'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)'], resale: 300, hardware: true}
       - {key: ps5_unknown, name: PS5 (version à confirmer), match: ['\bps ?5\b|playstation 5'], exclude: ['slim', '\bpro\b', '(?:digital|numerique|digitale)', '(?:lecteur|disque|disc|disk|standard|blu ?ray)'], resale: 290, generic: true, hardware: true}
       - {key: steamdeck_oled, name: Steam Deck OLED, match: ['steam ?deck oled'], resale: 430, new: 569, hardware: true}
-      - {key: steamdeck, name: Steam Deck LCD, match: ['steam ?deck'], exclude: ['oled'], resale: 280, hardware: true}
+      - {key: steamdeck, name: Steam Deck LCD, match: ['steam ?deck'], exclude: ['oled', 'carte|cartao|tarjeta|scheda|karte|sd ?card|micro ?sd|\bsd\b|batocera|ssd seul|dock|coque|case|etui|housse|grip|protection'], resale: 280, hardware: true}
       - {key: xsx, name: Xbox Series X, match: ['xbox series x'], resale: 300, new: 549, hardware: true}
       - {key: ps4_pro, name: PS4 Pro, match: ['(ps ?4|playstation 4) pro'], resale: 170, hardware: true}
       - {key: ps4_slim, name: PS4 Slim, match: ['(ps ?4|playstation 4) slim'], exclude: ['pro'], resale: 125, hardware: true}
@@ -479,7 +479,8 @@ niches:
       - {key: jbl_xtreme, name: JBL Xtreme 3/4, match: ['jbl xtreme ?[34]'], resale: 170, new: 349}
       - {key: jbl_partybox, name: JBL PartyBox, match: ['partybox'], resale: 220, generic: true}
       - {key: ue_megaboom, name: UE Megaboom 3/4, match: ['megaboom'], resale: 90, new: 199}
-      - {key: devialet, name: Devialet Phantom, match: ['devialet'], resale: 900, generic: true}
+      - {key: devialet, name: Devialet Phantom, match: ['devialet.*phantom|phantom.*devialet'], resale: 900, generic: true}
+      - {key: devialet_gemini, name: Devialet Gemini (écouteurs), match: ['devialet.*gemini|gemini.*devialet'], resale: 140, new: 299}
       - {key: kef_lsx, name: KEF LSX / LS50 Wireless, match: ['kef ls(?:x|50)'], resale: 600, generic: true}
 
   projectors:
@@ -538,6 +539,8 @@ niches:
     collectible: true
     model_guard:
       - '\b(?:bracelet seul|strap|boite seule|maillons?)\b'
+      # A strap or clasp sold alone ("Omega leather bracelet & original clasp"), not the watch
+      - '^(?!.*(?:montre|watch|reloj|orologio|\buhr\b|horloge|seamaster|speedmaster|constellation|de ville|automati\w*|quartz|chrono\w*)).*\b(?:bracelets?|clasp|fermoir|boucle deployante|deployant\w*|armband|cinturino|correa|band)\b'
     components: [{name: boîte/papiers, match: 'boite|papiers|certificat|carte de garantie', share: 0.12}, {name: bracelet d'origine, match: 'bracelet d origine', share: 0.08}]
     alone: []
     exclude: ['\bbracelet seul\b', '\bboite seule\b', '\bpile\b seule', '\bconnectee\b', '\bsmartwatch\b', '\benfant\b']
@@ -608,12 +611,12 @@ niches:
     models:
       # Bag models: a pouch, wallet, belt, shoe or garment of the same line is not the bag (LV Neverfull pochette,
       # Gucci Marmont belt, Prada Re-Edition sneakers...).
-      - {key: lv_speedy, name: Louis Vuitton Speedy, match: ['speedy'], resale: 550, new: 1650, exclude: &not_bag ['pochette|pouch|clutch|interna|interne|insert|organi[sz]er|wallet|portefeuille|portafoglio|cartera|geldborse|porte ?monnaie|porte ?cles?|portachiavi|key ?(?:holder|ring|chain)|keychain|charm|bijou de sac|ceinture|\bbelt|cintura|gurtel|cinturon|chaussures?|shoes?|sneakers?|baskets?|slippers?|mules?|escarpins?|decollete|loafers?|mocassins?|sandal\w*|boots?|bottes|bottines|lunettes|sunglasses|occhiali|foulard|scarf|sciarpa|sangle seule|strap only|dust ?bag seul|boite seule|empty box|cadenas|\block\b|card ?holder|porte ?cartes?|portacarte|bracelet|collier|necklace|bague|\bring\b|parfum|perfume|t ?shirt|\btee\b|pull|sweat|hoodie|veste|jacket|casquette|\bcap\b|chapeau|bonnet|pantalon|jupe|robe|toiletry|trousse']}
+      - {key: lv_speedy, name: Louis Vuitton Speedy, match: ['speedy'], resale: 550, new: 1650, exclude: &not_bag ['pochette|pouch|clutch|interna|interne|insert|organi[sz]er|wallet|portefeuille|portafoglio|cartera|geldborse|porte ?monnaie|porte ?cles?|portachiavi|key ?(?:holder|ring|chain)|keychain|charm|bijou de sac|ceinture|\bbelt|cintura|gurtel|cinturon|chaussures?|shoes?|sneakers?|baskets?|slippers?|mules?|escarpins?|decollete|loafers?|mocassins?|sandal\w*|boots?|bottes|bottines|lunettes|sunglasses|occhiali|foulard|scarf|sciarpa|sangle seule|strap only|dust ?bag seul|boite seule|empty box|cadenas|\block\b|card ?holder|porte ?cartes?|portacarte|bracelet|collier|necklace|halskette|kette|collana|collar|anhanger|pendentif|pendant|ohrringe|earrings|boucles d oreilles|orecchini|bague|\bring\b|parfum|perfume|t ?shirt|\btee\b|pull|sweat|hoodie|veste|jacket|casquette|\bcap\b|chapeau|bonnet|pantalon|jupe|robe|toiletry|trousse']}
       - {key: lv_neverfull, name: Louis Vuitton Neverfull, match: ['neverfull'], resale: 900, new: 2100, exclude: *not_bag}
       - {key: lv_neverfull_pochette, name: LV pochette de Neverfull, match: ['neverfull.*(?:pochette|clutch|pouch|interna)|(?:pochette|clutch|pouch|interna).*neverfull'], resale: 260}
       - {key: gucci_belt, name: Ceinture Gucci (GG / Marmont), match: ['gucci.*(?:ceinture|belt|cintura|gurtel|cinturon)|(?:ceinture|belt|cintura|gurtel|cinturon).*gucci'], resale: 220, new: 450}
       - {key: lv_pochette, name: LV Pochette Accessoires/Métis, match: ['louis vuitton.*pochette|pochette (?:metis|accessoires)'], resale: 600, new: 1300, generic: true}
-      - {key: hermes_carre, name: Carré Hermès 90, match: ['(?:carre|foulard).*hermes|hermes.*(?:carre|foulard)'], resale: 230, new: 520}
+      - {key: hermes_carre, name: Carré Hermès 90, match: ['(?:carre|foulard).*hermes|hermes.*(?:carre|foulard)'], resale: 230, new: 520, exclude: ['livre|book|libro|buch|catalogue|magazine|cadre|frame|poster|affiche|coussin|cushion|housse']}
       - {key: hermes_belt, name: Ceinture Hermès H, match: ['ceinture.*hermes|hermes.*ceinture'], resale: 450, new: 950}
       - {key: longchamp_pliage, name: Longchamp Le Pliage, match: ['pliage'], resale: 60, new: 145}
       - {key: lv_alma, name: Louis Vuitton Alma, match: ['\balma\b'], resale: 650, new: 1850, exclude: *not_bag}
